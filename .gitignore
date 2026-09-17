@@ -1,0 +1,10 @@
+.env
+*.bak-*
+__pycache__/
+*.pyc
+# Karten-Binaerdaten liegen im knowledge-vault, nicht im Repo
+maps/
+*.pmtiles
+
+# Laufprotokolle der langen Rechenlaeufe
+*.log

@@ -1,0 +1,2372 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Karten — Offline (Homelab)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#f7f6f2" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/karte.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/maplibre-gl.css" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #f7f6f2; font-family: system-ui, sans-serif; }
+    #map { position: absolute; inset: 0; }
+    #banner { position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+      background: #b23; color: #fff; padding: 10px 14px; font-size: 14px; display: none; }
+    /* ★★ bottom: 36px, nicht 8px. Der Massstabsbalken von MapLibre sitzt in
+       derselben Ecke, und diese Anzeige lag mit hoeherem z-index genau darueber:
+       gemessen deckte ihr Kasten (8..158 px) den Balken (10..77 px) vollstaendig
+       ab, elementFromPoint an der Stelle des Balkens lieferte "hud". Sichtbar
+       war der Balken nur, solange diese Anzeige leer ist, also nie im Gebrauch.
+       In einem Bild sah das aus wie ein kaputter Massstab, der nur noch "m"
+       zeigt. Er war die ganze Zeit in Ordnung, nur verdeckt. */
+    #hud { position: absolute; bottom: 36px; left: 8px; z-index: 5; background: rgba(255,255,255,.85);
+      padding: 4px 8px; border-radius: 6px; font-size: 12px; color: #333; font-variant-numeric: tabular-nums; }
+    .maplibregl-ctrl-attrib { font-size: 10px; }
+    /* Zwei Knopfleisten untereinander: oben die Kartenregion, darunter die
+       Bildebene. Gemeinsamer Rahmen, damit die zweite nicht ins Leere rutscht,
+       wenn die erste ausgeblendet bleibt (nur eine Region vorhanden). */
+    #ebenen { position: absolute; top: 56px; left: 8px; z-index: 5;
+      display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+    #regionsel, #bildsel, #reliefsel, #poisel { display: none;
+      background: rgba(255,255,255,.92); border-radius: 6px; overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+    #regionsel button, #bildsel button, #reliefsel button, #poisel button { border: 0; background: transparent;
+      padding: 7px 12px; font-size: 13px; color: #444; cursor: pointer;
+      font-family: inherit; }
+    #regionsel button.on, #bildsel button.on, #reliefsel button.on, #poisel button.on { background: #3a6ea5; color: #fff; }
+    /* Die Reliefleiste schaltet ZWEI unabhaengige Dinge (Gelaende, Gebaeude),
+       die beiden anderen Leisten je genau eines. Ein Trennstrich macht sichtbar,
+       dass hier nicht eine Auswahl, sondern zwei Schalter stehen. */
+    #reliefsel button + button { border-left: 1px solid #e2ded6; }
+    #suche { position: absolute; top: 8px; left: 8px; z-index: 6; width: min(320px, calc(100vw - 90px)); }
+    #suche input { width: 100%; box-sizing: border-box; border: 0; border-radius: 6px;
+      padding: 10px 12px; font-size: 15px; font-family: inherit; color: #222;
+      background: rgba(255,255,255,.95); box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+    #suche input:focus { outline: 2px solid #3a6ea5; }
+    #suche input { padding-right: 38px; }
+    /* ★ Sichtbarer Zugang zur Merkliste. Sie erschien bisher NUR, wenn man ins
+       leere Suchfeld tippte — funktionsfähig, aber unauffindbar: ein gemerkter
+       Ort war danach praktisch verschwunden. Ein Merkzettel, den man nicht
+       wiederfindet, ist keiner. */
+    #merkbtn { position: absolute; right: 6px; top: 6px; width: 28px; height: 28px;
+      border: 0; border-radius: 4px; background: transparent; color: #c8a53a;
+      font-size: 17px; line-height: 1; cursor: pointer; padding: 0; }
+    #merkbtn:hover { background: #f0ece0; }
+    #merkbtn.leer { color: #c9c4bb; }
+    #treffer { margin-top: 4px; background: rgba(255,255,255,.97); border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25); max-height: 46vh; overflow-y: auto; display: none; }
+    #treffer div { padding: 9px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid #eee; }
+    #treffer div:last-child { border-bottom: 0; }
+    #treffer div:hover, #treffer div.aktiv { background: #eaf1f8; }
+    #treffer .meta { color: #777; font-size: 12px; margin-left: 6px; }
+    /* Hinweis nur im unsicheren Kontext — bewusst gelb statt rot: es ist kein
+       Fehler, die Karte funktioniert vollstaendig, nur GPS bleibt gesperrt. */
+    #unsicher { position: absolute; bottom: 8px; right: 8px; z-index: 6;
+      max-width: min(340px, calc(100vw - 16px)); display: none;
+      background: #fdf3d0; border: 1px solid #e0c56a; border-radius: 6px;
+      padding: 9px 11px; font-size: 12.5px; line-height: 1.45; color: #4a3c10;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    #unsicher a { color: #2f5c8f; }
+    #unsicher button { float: right; margin-left: 8px; border: 0; background: transparent;
+      font-size: 15px; line-height: 1; color: #8a7a3a; cursor: pointer; }
+
+    /* ---- Routenplanung ---- */
+    #routebtn { position: absolute; top: 8px; right: 8px; z-index: 7; width: 29px; height: 29px;
+      border: 0; border-radius: 4px; background: rgba(255,255,255,.95); cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 15px; color: #3a6ea5; }
+    #routebtn.on { background: #3a6ea5; color: #fff; }
+    #routebox { position: absolute; top: 44px; right: 8px; z-index: 7; display: none;
+      width: min(330px, calc(100vw - 16px)); background: rgba(255,255,255,.97);
+      border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.28); padding: 9px; }
+    .rz { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .rz .pin { flex: 0 0 20px; height: 20px; border-radius: 50%; color: #fff; font-size: 11px;
+      font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .rz .pin.a { background: #2e7d4f; } .rz .pin.b { background: #a3402f; }
+    .rz input { flex: 1 1 auto; min-width: 0; border: 1px solid #d8d4cc; border-radius: 4px;
+      padding: 7px 9px; font-size: 14px; font-family: inherit; color: #222; }
+    .rz input:focus { outline: 2px solid #3a6ea5; border-color: transparent; }
+    .rz .hier { flex: 0 0 auto; border: 1px solid #d8d4cc; background: #fff; border-radius: 4px;
+      padding: 6px 7px; font-size: 12px; cursor: pointer; color: #555; }
+    #rtreffer { background: #fff; border: 1px solid #e2ded6; border-radius: 4px; display: none;
+      max-height: 34vh; overflow-y: auto; margin-bottom: 6px; }
+    #rtreffer div { padding: 7px 10px; font-size: 13.5px; cursor: pointer; border-bottom: 1px solid #f0ede7; }
+    #rtreffer div:last-child { border-bottom: 0; }
+    #rtreffer div:hover { background: #eaf1f8; }
+    #rmodi { display: flex; gap: 4px; margin-bottom: 6px; }
+    #rmodi button { flex: 1; border: 1px solid #d8d4cc; background: #fff; border-radius: 4px;
+      padding: 6px 0; font-size: 13px; font-family: inherit; color: #555; cursor: pointer; }
+    #rmodi button.on { background: #3a6ea5; border-color: #3a6ea5; color: #fff; }
+    #rgo { width: 100%; border: 0; border-radius: 4px; background: #3a6ea5; color: #fff;
+      padding: 9px 0; font-size: 14px; font-family: inherit; cursor: pointer; }
+    #rgo:disabled { background: #b6c4d3; cursor: default; }
+    /* Erscheint erst, wenn eine Route auf der Karte liegt — ein dauerhaft
+       sichtbarer Entfernen-Knopf ohne etwas zu entfernen verwirrt mehr, als er
+       hilft. */
+    #rweg { display: none; width: 100%; margin-top: 5px; border: 1px solid #d8d4cc;
+      border-radius: 4px; background: #fff; color: #666; padding: 7px;
+      font-size: 13px; font-family: inherit; cursor: pointer; }
+    #rweg:hover { background: #f4f2ee; color: #333; }
+    #rerg { margin-top: 8px; font-size: 13px; color: #333; }
+    #rerg .kopf { font-weight: 700; font-size: 15px; margin-bottom: 5px; }
+    #rerg ol { margin: 0; padding-left: 18px; max-height: 30vh; overflow-y: auto; }
+    #rerg li { margin-bottom: 4px; line-height: 1.35; }
+    #rerg .weg { color: #777; }
+    /* Höhenprofil: erscheint nur, wenn der Routing-Dienst Höhen liefert. */
+    #rerg .profil { margin: 2px 0 7px; }
+    #rerg .profil svg { display: block; width: 100%; height: 46px;
+      background: #f4f2ee; border-radius: 4px; }
+    #rerg .steig { font-size: 12px; color: #666; margin-bottom: 5px;
+      font-variant-numeric: tabular-nums; }
+    #rerg .steig b { font-weight: 600; color: #444; }
+    /* Start und Ziel vertauschen — der Rueckweg ist der haeufigste zweite Weg. */
+    #rtausch { display: block; margin: -2px 0 6px 26px; border: 0; background: transparent;
+      font-size: 12.5px; color: #3a6ea5; cursor: pointer; font-family: inherit; padding: 0; }
+
+    /* ---- Gemerkte Orte + Kartenmenue ---- */
+    #treffer div.merk .stern { color: #c9a227; margin-right: 5px; }
+    #treffer div.merk .weg { float: right; color: #aaa; padding: 0 2px; }
+    #treffer div.merk .weg:hover { color: #b23; }
+    #kmenue { position: absolute; z-index: 8; display: none; min-width: 178px;
+      background: rgba(255,255,255,.98); border-radius: 6px; overflow: hidden;
+      box-shadow: 0 3px 14px rgba(0,0,0,.3); }
+    #kmenue button { display: block; width: 100%; border: 0; background: transparent;
+      text-align: left; padding: 10px 13px; font-size: 13.5px; font-family: inherit;
+      color: #333; cursor: pointer; border-bottom: 1px solid #f0ede7; }
+    #kmenue button:last-child { border-bottom: 0; }
+    #kmenue button:hover { background: #eaf1f8; }
+    #kmenue .kopf { padding: 7px 13px; font-size: 11.5px; color: #777; background: #f7f6f2;
+      font-variant-numeric: tabular-nums; }
+
+    /* ---- Navigation (Folgemodus) ----
+       Bewusst gross und kontrastreich: das hier wird im fahrenden Auto aus
+       einem Meter Entfernung mit einem Seitenblick gelesen, nicht am
+       Schreibtisch. Alles andere blendet sich waehrenddessen aus. */
+    body.navi #suche, body.navi #routebtn, body.navi #routebox,
+    body.navi #ebenen, body.navi #hud, body.navi #unsicher { display: none !important; }
+    /* Einbettung: die Karte als Baustein in einer anderen Anwendung. Alles, was
+       zum Suchen und Umschalten da ist, gehoert dann in die einbettende Seite
+       und nicht in eine 200 Pixel hohe Flaeche. Der Massstab bleibt: eine Karte
+       ohne Massstab laesst Entfernungen raten. */
+    body.einbetten #suche, body.einbetten #routebtn, body.einbetten #routebox,
+    body.einbetten #ebenen, body.einbetten #hud, body.einbetten #unsicher,
+    body.einbetten .maplibregl-ctrl-top-right { display: none !important; }
+    body.einbetten #groesser { display: block; }
+    #groesser { display: none; position: absolute; top: 8px; right: 8px; z-index: 7;
+      background: rgba(255,255,255,.92); border-radius: 6px; padding: 5px 9px;
+      font-size: 12.5px; color: #2f5c8f; text-decoration: none;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+    #navi { position: absolute; z-index: 12; display: none; left: 0; right: 0; top: 0;
+      padding: 12px 14px 14px; color: #fff; background: #26303a;
+      box-shadow: 0 2px 12px rgba(0,0,0,.4); }
+    body.navi #navi { display: block; }
+    #navi .jetzt { display: flex; align-items: center; gap: 14px; }
+    #navi .pfeil { font-size: 40px; line-height: 1; flex: 0 0 auto; }
+    #navi .text { flex: 1 1 auto; min-width: 0; }
+    #navi .entfernung { font-size: 30px; font-weight: 700; line-height: 1.05;
+      font-variant-numeric: tabular-nums; }
+    #navi .anweisung { font-size: 17px; line-height: 1.25; margin-top: 3px;
+      overflow-wrap: anywhere; }
+    #navi .danach { margin-top: 9px; padding-top: 8px; border-top: 1px solid #3d4854;
+      font-size: 13.5px; color: #b9c4d0; overflow-wrap: anywhere; }
+    #navileiste { position: absolute; z-index: 12; display: none; left: 0; right: 0; bottom: 0;
+      padding: 9px 12px; color: #fff; background: #26303a; align-items: center; gap: 12px;
+      font-size: 14px; font-variant-numeric: tabular-nums; }
+    body.navi #navileiste { display: flex; }
+    #navileiste .rest { flex: 1 1 auto; }
+    #navileiste button { border: 1px solid #4a5561; border-radius: 5px; background: #33404d;
+      color: #fff; font-family: inherit; font-size: 13px; padding: 7px 11px; cursor: pointer; }
+    #navileiste button:hover { background: #405060; }
+    #navileiste .warn { color: #ffd27f; }
+    /* Nachtmodus faerbt die Kartenebenen um (setPaintProperty), nicht die
+       Bedienung — die ist ohnehin schon dunkel. */
+    #rnavi { display: none; width: 100%; margin-top: 5px; border: 0; border-radius: 4px;
+      background: #2e7d4f; color: #fff; padding: 9px; font-size: 14px; font-weight: 600;
+      font-family: inherit; cursor: pointer; }
+    #rnavi:hover { background: #276b44; }
+  </style>
+</head>
+<body>
+  <div id="banner"></div>
+  <div id="map"></div>
+  <div id="suche"><input type="search" id="q" placeholder="Ort suchen …" autocomplete="off" enterkeyhint="search" /><button id="merkbtn" title="Gemerkte Orte" aria-label="Gemerkte Orte">★</button><div id="treffer"></div></div>
+  <div id="ebenen"><div id="regionsel"></div><div id="bildsel"></div><div id="reliefsel"></div><div id="poisel"></div></div>
+  <a id="groesser" href="/" target="_blank" rel="noopener">Karte öffnen</a>
+  <div id="hud">—</div>
+  <button id="routebtn" title="Route planen" aria-label="Route planen">⇄</button>
+  <div id="routebox">
+    <div class="rz"><span class="pin a">A</span>
+      <input id="rstart" type="search" placeholder="Start — Ort oder Straße" autocomplete="off" />
+      <button class="hier" data-ziel="rstart" title="Kartenmitte übernehmen">Mitte</button></div>
+    <button id="rtausch" title="Start und Ziel vertauschen">⇅ Start und Ziel tauschen</button>
+    <div class="rz"><span class="pin b">B</span>
+      <input id="rziel" type="search" placeholder="Ziel" autocomplete="off" />
+      <button class="hier" data-ziel="rziel" title="Kartenmitte übernehmen">Mitte</button></div>
+    <div id="rtreffer"></div>
+    <div id="rmodi">
+      <button data-c="auto" class="on">Auto</button>
+      <button data-c="bicycle">Rad</button>
+      <button data-c="pedestrian">Fuß</button>
+    </div>
+    <button id="rgo">Route berechnen</button>
+    <button id="rnavi">▶ Navigation starten</button>
+    <button id="rweg">Route entfernen</button>
+    <div id="rerg"></div>
+  </div>
+  <div id="navi">
+    <div class="jetzt">
+      <div class="pfeil" id="navipfeil">↑</div>
+      <div class="text">
+        <div class="entfernung" id="navientfernung">—</div>
+        <div class="anweisung" id="navianweisung">Warte auf Standort …</div>
+      </div>
+    </div>
+    <div class="danach" id="navidanach"></div>
+  </div>
+  <div id="navileiste">
+    <span class="rest" id="navirest">—</span>
+    <span id="navizustand"></span>
+    <button id="navinacht">Nacht</button>
+    <button id="naviende">Beenden</button>
+  </div>
+  <div id="unsicher"></div>
+  <div id="kmenue"></div>
+  <script src="/maplibre-gl.js"></script>
+  <script src="/pmtiles.js"></script>
+  <script>
+    const banner = document.getElementById('banner');
+    function warn(msg) { banner.textContent = msg; banner.style.display = 'block'; }
+
+    // GPS-Knopf ohne sicheren Kontext: Browser geben navigator.geolocation nur
+    // ueber HTTPS (oder localhost) frei. Der Knopf ist dann sichtbar, tut aber
+    // nichts — das sah lange nach einem Defekt aus. Deshalb dieser Hinweis:
+    // er erscheint NUR, wenn die Seite unsicher geladen wurde.
+    // ★ Drei sehr verschiedene Ursachen sehen im Browser voellig gleich aus:
+    //   der GPS-Knopf tut nichts und es kommt keine Nachfrage. Unverschluesselt
+    //   geladen, Schnittstelle fehlt, oder dauerhaft blockiert — von aussen
+    //   nicht zu unterscheiden. Deshalb sagt die Seite selbst, welche es ist,
+    //   samt der Adresse, unter der sie gerade laeuft.
+    function zeigen(html) {
+      const box = document.getElementById('unsicher');
+      box.innerHTML =
+        '<button title="Ausblenden" aria-label="Ausblenden">&times;</button>' + html;
+      box.querySelector('button').onclick = () => { box.style.display = 'none'; };
+      box.style.display = 'block';
+    }
+
+    (function standortLage() {
+      if (!window.isSecureContext) {
+        zeigen('<b>Standort gesperrt: unverschl&uuml;sselt geladen.</b> Diese Seite l&auml;uft ' +
+               'gerade als <code>' + location.protocol + '//' + location.host + '</code> — ' +
+               'der GPS-Knopf braucht HTTPS. Stattdessen ' +
+               '<a href="https://karten.home.arpa/">karten.home.arpa</a> &ouml;ffnen. ' +
+               'Warnt der Browser dort, fehlt einmalig die Homelab-CA: ' +
+               '<a href="/host-local-ca.crt" download>host-local-ca.crt</a> laden und ' +
+               'unter Einstellungen als CA-Zertifikat installieren.');
+        return;
+      }
+      if (!navigator.geolocation) {
+        zeigen('<b>Standort gesperrt: der Browser bietet die Schnittstelle nicht an.</b> ' +
+               'Die Seite l&auml;uft verschl&uuml;sselt (<code>' + location.host + '</code>), ' +
+               'trotzdem fehlt <code>navigator.geolocation</code>. Bei Firefox f&uuml;r Android ' +
+               'ist das meist der eigene Zertifikatsspeicher — zum Gegentest dieselbe ' +
+               'Adresse in Chrome &ouml;ffnen.');
+        return;
+      }
+      // „denied" heisst: der Browser fragt gar nicht mehr nach. Das sieht aus
+      // wie ein kaputter Knopf, ist aber eine gemerkte Entscheidung.
+      if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(st => {
+          if (st.state === 'denied') {
+            zeigen('<b>Standort wurde f&uuml;r diese Seite blockiert.</b> Der Browser fragt ' +
+                   'deshalb nicht mehr nach. Im Schloss-Symbol links in der Adresszeile die ' +
+                   'Berechtigung „Standort" zur&uuml;cksetzen. Die App-Berechtigung von ' +
+                   'Firefox selbst reicht daf&uuml;r nicht.');
+          }
+        }).catch(() => {});
+      }
+    })();
+
+    // pmtiles-Protokoll registrieren (liest die .pmtiles per HTTP-Range)
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+
+    // Verfuegbare Kartenregionen. Reihenfolge = Vorrang; die erste tatsaechlich
+    // vorhandene Datei wird beim Start geladen, fehlende blendet die HEAD-Probe
+    // weiter unten aus, und bei nur einer Region erscheint gar kein Umschalter.
+    // Eine weitere Region eintraegt man hier und baut sie mit extract-maps.sh.
+    // ★ Nur eintragen, was auch gebaut wurde: germany.pmtiles und europe.pmtiles
+    //   standen hier, existierten aber nicht (europe wurde am 26.08. geloescht,
+    //   um 22 GB freizugeben). Ein toter Eintrag kostet bei jedem Seitenaufruf
+    //   eine 404-Anfrage und behauptet in der Bedienung eine Wahl, die es nie gab.
+    const REGIONEN = [
+      { id: 'de-nl',   label: 'DE + NL',     datei: 'de-nl.pmtiles',   center: [8.5, 51.3], zoom: 5.6 }
+    ];
+    const pmUrl = (r) => 'pmtiles://' + location.origin + '/maps/' + r.datei;
+
+    // ?v= erhoehen, wenn style.json ODER places.json geaendert wurde. Noetig,
+    // weil aeltere Browser den Style mit "immutable, 30d" gecacht haben und ohne
+    // neue URL gar nicht erst nachfragen wuerden.
+    const V = '2026-09-06a';
+
+    // ★ Die Weltebene liegt UNTER der Detailkarte und wird nur dort sichtbar, wo
+    //   der Regionsausschnitt aufhoert. Ohne sie endet die Karte an der bbox-Kante
+    //   (gemessen: bei z8 fehlen Paris, London, Warschau, Oslo, Mailand) und
+    //   ringsum bleibt eine leere Flaeche stehen — neben der blauen Nordsee liest
+    //   sich das als Wasser. Sie darf fehlen: dann werden Quelle und Ebenen aus
+    //   dem Stil geworfen, und die Karte verhaelt sich wie vorher.
+    //   ★★ Ihre Flaechenebenen enden in style.json bei z9 (maxzoom). welt.pmtiles
+    //   reicht nur bis z7; alles darueber ist Ueberzoom, und eine bei z7
+    //   generalisierte Kueste sitzt bei z13 um Kilometer daneben. Weil sie exakt
+    //   dasselbe Blau traegt wie echtes Wasser, sah das aus wie Wasser ueber Land.
+    //   Ortsnamen bleiben ohne Grenze: ein Punkt verrutscht beim Ueberzoomen nicht.
+    Promise.all([
+      fetch('/style.json?v=' + V).then(r => r.json()),
+      fetch('/maps/welt.pmtiles', { method: 'HEAD' }).then(r => r.ok).catch(() => false),
+    ]).then(([style, hatWelt]) => {
+      const styleFuer = (r) => {
+        const st = JSON.parse(JSON.stringify(style));
+        st.sources.protomaps.url = pmUrl(r);
+        if (hatWelt) {
+          st.sources.welt.url = 'pmtiles://' + location.origin + '/maps/welt.pmtiles';
+        } else {
+          delete st.sources.welt;
+          st.layers = st.layers.filter(l => l.source !== 'welt');
+        }
+        return st;
+      };
+      // Vorlaeufig die erste Region; die HEAD-Probe unten korrigiert auf die
+      // erste tatsaechlich vorhandene, falls die bevorzugte noch nicht gebaut ist.
+      let aktuell = REGIONEN[0];
+
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: styleFuer(aktuell),
+        center: [10.2, 51.2],   // Mitte Deutschland
+        zoom: 5.4,
+        // ★ 20, nicht 18: seit 2026-08-25 zeigt die Karte auch OHNE Luftbild
+        //   etwas in dieser Tiefe — Hausnummern ab z18 und Gebaeude in 3D.
+        //   Vorher war bei 18 Schluss, und der Unterschied zwischen 18 und 20
+        //   blieb der Bildebene vorbehalten.
+        maxZoom: 20,
+        hash: true              // Position in der URL (teilbar/merkbar)
+      });
+
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
+      map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }));
+      // GPS des Geräts funktioniert AUCH offline — echte Standortbestimmung ohne Internet.
+      // ★ timeout gesetzt: ohne ihn wartet die Abfrage unbegrenzt. Drinnen, ohne
+      //   Satellitenempfang, sieht das aus wie ein toter Knopf.
+      const gpsKnopf = new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+        trackUserLocation: true, showUserLocation: true
+      });
+      map.addControl(gpsKnopf, 'top-right');
+
+      // ★★ MapLibre schaltet den Knopf bei „abgelehnt" DAUERHAFT ab (bis zum
+      //    Neuladen) und sagt kein Wort dazu. Genau dann braucht man aber den
+      //    Grund: der Fehlercode unterscheidet die drei Ursachen eindeutig,
+      //    die von aussen alle gleich aussehen.
+      gpsKnopf.on('error', e => {
+        const code = e && e.code;
+        const erklaerung = {
+          1: '<b>Standort abgelehnt (Code 1).</b> Nicht das Ger&auml;t verweigert, sondern ' +
+             'der Browser f&uuml;r DIESE Seite. Im Schloss-Symbol links in der Adresszeile ' +
+             'die Berechtigung „Standort" zur&uuml;cksetzen — die App-Berechtigung von ' +
+             'Firefox reicht daf&uuml;r nicht. Bei Firefox f&uuml;r Android hilft sonst der ' +
+             'Gegentest in Chrome.',
+          2: '<b>Standort nicht ermittelbar (Code 2).</b> Der Browser durfte fragen, das ' +
+             'Ger&auml;t liefert aber keine Position. Meist ist die Standortermittlung in ' +
+             'den Android-Einstellungen aus, oder drinnen ohne Satellitenempfang.',
+          3: '<b>Zeit&uuml;berschreitung (Code 3).</b> 15 Sekunden ohne Positionsbestimmung. ' +
+             'Drau&szlig;en oder am Fenster nochmal versuchen.',
+        }[code];
+        zeigen((erklaerung || '<b>Standort fehlgeschlagen.</b> ' +
+                (e && e.message ? String(e.message) : 'ohne n&auml;here Angabe')) +
+               ' <br><small>Seite l&auml;uft als <code>' + location.protocol + '//' +
+               location.host + '</code>, sicherer Kontext: ' +
+               (window.isSecureContext ? 'ja' : 'NEIN') + '. Nach dem Beheben die Seite ' +
+               'neu laden — der Knopf bleibt sonst abgeschaltet.</small>');
+      });
+
+      const hud = document.getElementById('hud');
+      // ★ Gefragt wird `map.getTerrain()`, nicht der Schaltzustand des Knopfes:
+      //   der Knopf steht weiter unten im Skript, und eine Mausbewegung vor
+      //   seiner Deklaration liefe in die temporale Totzone. Der Kartenzustand
+      //   ist ohnehin die ehrlichere Quelle — er sagt, ob wirklich Hoehen da sind.
+      function hoeheText(lngLat) {
+        const gelaende = map.getTerrain();
+        if (!gelaende) return '';
+        const h = map.queryTerrainElevation(lngLat);
+        if (typeof h !== 'number' || !isFinite(h)) return '';
+        // ★★ queryTerrainElevation liefert die Hoehe der DARSTELLUNG, also
+        //    einschliesslich der Ueberhoehung, mit der das Gelaende gekippt
+        //    gezeichnet wird. Bei 1.3 wurden aus 223 echten Metern 291
+        //    angezeigte. Gegen Valhalla, das dieselben Hoehendaten aus einer
+        //    anderen Quelle kennt, lag die Anzeige an vier Messpunkten
+        //    durchgehend um den Faktor 1,3 zu hoch.
+        //    Der Faktor kommt aus dem Kartenzustand, nicht als zweite Zahl in
+        //    den Code: sonst stimmt die Anzeige beim naechsten Anfassen der
+        //    Ueberhoehung still nicht mehr.
+        const echt = h / (gelaende.exaggeration || 1);
+        // ★★ Fehlt die Hoehenkachel noch, gibt MapLibre exakt 0 zurueck. Das
+        //    ist kein Messwert, sieht aber wie Meereshoehe aus, und genau so
+        //    stand direkt nach dem Einschalten "0 m" ueber einem 223 m hohen
+        //    Hang. Exakt 0 heisst hier immer "noch nichts da": die Hoehendaten
+        //    decken NRW ab, dessen tiefster Punkt am Niederrhein bei rund
+        //    zehn Metern liegt. Ein Wert von genau 0,00 kommt darin nicht vor.
+        //    ★ Nicht ueber `areTilesLoaded()` entscheiden, das war der erste
+        //      Versuch und er trug nicht: MapLibre meldet die Karte als fertig,
+        //      bevor die Hoehenkacheln abfragbar sind, und schrieb dann wieder
+        //      eine glatte 0 hin.
+        if (echt === 0) return '  ·  Höhe lädt';
+        return `  ·  ${Math.round(echt)} m`;
+      }
+      // ★ Ausserhalb des Detailausschnitts endet die Karte ab z9 bei Ortsnamen
+      //   auf leerer Flaeche — die Weltebene reicht nur bis z7, und ihre
+      //   Flaechen 32-fach vergroessert waeren keine Auskunft, sondern eine
+      //   falsche. Eine leere Flaeche liest sich aber wie ein Defekt, deshalb
+      //   steht der Grund dabei. Die Grenze kommt aus der geladenen Quelle
+      //   selbst (pmtiles-TileJSON), nicht aus einer zweiten Zahl im Code, die
+      //   beim naechsten Zuschnitt still falsch wuerde.
+      function ausserhalbText(ll) {
+        if (map.getZoom() < 9) return '';
+        let b;
+        try { b = map.getSource('protomaps')?.bounds; } catch (e) { return ''; }
+        if (!b || b.length !== 4) return '';
+        const drin = ll.lng >= b[0] && ll.lng <= b[2] && ll.lat >= b[1] && ll.lat <= b[3];
+        return drin ? '' : '  ·  ausserhalb der Kartendaten';
+      }
+      const zeigeOrt = (ll) => {
+        hud.textContent = `${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}` +
+                          `  ·  z${map.getZoom().toFixed(1)}${hoeheText(ll)}` +
+                          ausserhalbText(ll);
+      };
+      map.on('mousemove', e => zeigeOrt(e.lngLat));
+      map.on('moveend', () => zeigeOrt(map.getCenter()));
+      // Nach dem Einschalten des Gelaendes steht "Höhe lädt", bis die Karte
+      // einmal angefasst wird. Das ist Absicht und kein halber Zustand: eine
+      // Zahl waere dort erfunden.
+      // ★★ NICHT nochmal versuchen, das von selbst nachzutragen. Gemessen am
+      //    2026-08-29: `map.queryTerrainElevation` liefert mit der gespeicherten
+      //    Position auch nach zwanzig Sekunden konstant 0, waehrend dieselbe
+      //    Abfrage aus einem frischen `mousemove` sofort 249 m ergibt. Es liegt
+      //    also weder an der Ladezeit (ein Nachschlag ueber acht Runden half
+      //    nicht) noch am fehlenden Neuzeichnen (`triggerRepaint` half auch
+      //    nicht). Ein `idle`-Handler, der die Zeile neu schreibt, macht es
+      //    sogar schlechter: er ersetzt "Höhe lädt" durch eine glatte 0, weil
+      //    `areTilesLoaded()` dann schon true meldet.
+      //    Im Gebrauch faellt das nicht auf, weil jede Zeigerbewegung und jedes
+      //    Verschieben die Zeile ohnehin neu fuellt.
+      map.on('error', e => {
+        if (e && e.error && /pmtiles|maps\//.test(String(e.error.message || e.error))) {
+          warn('Kartendaten (' + aktuell.datei + ') fehlen oder werden noch erstellt — extract-maps.sh läuft?');
+        }
+      });
+
+
+      // ---- Ortssuche (offline) ---------------------------------------------
+      // Der Index (/maps/places.json, GeoNames) wird erst beim ersten Tippen
+      // geladen — die Karte startet dadurch unveraendert schnell.
+      const eingabe = document.getElementById('q');
+      const trefferBox = document.getElementById('treffer');
+      let orte = null, ladelauf = null, markierung = null, auswahl = -1;
+
+      // Ein Ort braucht ZWEI Schreibformen, sonst faellt je eine Eingabeart durch:
+      //   "Zürich" -> zurich  (nur Diakritika strippen)  <- Eingabe "Zurich"
+      //   "Zürich" -> zuerich (deutsch umschreiben)      <- Eingabe "Zuerich"
+      // Eine allein reicht nicht: mit nur der Umschreibung fand "Zurich" nichts,
+      // mit nur dem Strippen fand "Muenchen" nichts (beides live geprueft).
+      const strippen = (s) => s.toLowerCase().normalize('NFKD')
+                               .replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss');
+      const umschreiben = (s) => s.toLowerCase()
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+      const formen = (s) => [...new Set([strippen(s), umschreiben(s)])];
+
+      function ladeOrte() {
+        if (orte) return Promise.resolve(orte);
+        if (!ladelauf) {
+          ladelauf = fetch('/maps/places.json?v=' + V)
+            .then(r => r.json())
+            .then(d => {
+              // [name, lat, lon, einwohner, land, adm1] -> Suchform vorberechnen
+              // f = alle Suchformen des Anzeigenamens UND der Alternativnamen
+              // (Original-/Landessprache), damit "Munich" ebenso zu München fuehrt.
+              orte = d.map(e => ({
+                n: e[0], lat: e[1], lon: e[2], p: e[3], l: e[4],
+                f: [...new Set([e[0], ...(e[6] || [])].flatMap(formen))]
+              }));
+              return orte;
+            })
+            .catch(() => { warn('Ortsindex konnte nicht geladen werden.'); return []; });
+        }
+        return ladelauf;
+      }
+
+      function suche(text) {
+        const roh = text.trim();
+        if (roh.length < 2) return [];
+        const qf = formen(roh);
+        const beginnt = [], enthaelt = [];
+        for (const o of orte) {
+          if (o.f.some(f => qf.some(q => f.startsWith(q)))) beginnt.push(o);
+          else if (o.f.some(f => qf.some(q => f.includes(q)))) enthaelt.push(o);
+          if (beginnt.length >= 60) break;      // Index ist nach Einwohnern sortiert
+        }
+        return beginnt.concat(enthaelt).slice(0, 12);
+      }
+
+      // Strassen kommen NICHT aus dem Ortsindex, sondern direkt aus den gerade
+      // geladenen Kartenkacheln (Ebene "roads" fuehrt name/name:de mit). Deshalb
+      // nur im sichtbaren Ausschnitt und erst ab Zoom 13, wo Strassen in den
+      // Kacheln stecken. Ein landesweiter Strassenindex waere ein eigener Dienst:
+      // Deutschland+NL haben ueber eine Million Strassennamen — zu viel fuer den
+      // Browser, das braeuchte eine serverseitige Suche.
+      const STRASSEN_ZOOM = 13;
+
+      function sucheStrassen(text) {
+        if (map.getZoom() < STRASSEN_ZOOM) return [];
+        const qf = formen(text.trim());
+        let roh;
+        try {
+          roh = map.querySourceFeatures('protomaps', { sourceLayer: 'roads' });
+        } catch (e) { return []; }
+        const gesehen = new Map();
+        for (const f of roh) {
+          const name = f.properties['name:de'] || f.properties.name;
+          if (!name || gesehen.has(name)) continue;
+          const nf = formen(name);
+          if (!nf.some(n => qf.some(q => n.startsWith(q) || n.includes(q)))) continue;
+          // Repraesentativen Punkt aus der Linie ziehen
+          const g = f.geometry;
+          let punkt = null;
+          if (g.type === 'LineString') punkt = g.coordinates[Math.floor(g.coordinates.length/2)];
+          else if (g.type === 'MultiLineString') {
+            const l = g.coordinates[0]; punkt = l[Math.floor(l.length/2)];
+          }
+          if (punkt) gesehen.set(name, { n: name, lon: punkt[0], lat: punkt[1], strasse: true,
+                                         art: f.properties.kind });
+          if (gesehen.size >= 8) break;
+        }
+        return [...gesehen.values()];
+      }
+
+      function zeige(orte_, strassen, adressStrassen) {
+        trefferBox.innerHTML = '';
+        auswahl = -1;
+        const zeile = (haupt, neben, klick) => {
+          const z = document.createElement('div');
+          z.innerHTML = '<b></b><span class="meta"></span>';
+          z.querySelector('b').textContent = haupt;
+          z.querySelector('.meta').textContent = neben;
+          z.onclick = klick;
+          trefferBox.appendChild(z);
+        };
+        // Adressstrassen zuerst: wer eine Strasse tippt, meint fast immer eine
+        // Hausnummer darin — und nur dieser Weg fuehrt dorthin.
+        (adressStrassen || []).slice(0, 6).forEach(st =>
+          zeile(st.name, st.ort + ' · ' + st.anzahl + ' Hausnummern',
+                () => waehleStrasse(st)));
+        orte_.forEach(o => {
+          const ew = o.p >= 1000 ? (o.p >= 1000000 ? (o.p/1e6).toFixed(1)+' Mio.' : Math.round(o.p/1000)+'k') : '';
+          zeile(o.n, [o.l, ew].filter(Boolean).join(' · '), () => springe(o));
+        });
+        strassen.forEach(st => zeile(st.n, 'Straße im Ausschnitt', () => springe(st)));
+        if (!orte_.length && !strassen.length && !(adressStrassen || []).length) {
+          if (map.getZoom() < STRASSEN_ZOOM) {
+            zeile('Kein Ort gefunden', 'für Straßen näher heranzoomen (ab Zoom '+STRASSEN_ZOOM+')', () => {});
+          } else {
+            trefferBox.style.display = 'none';
+            return;
+          }
+        }
+        trefferBox.style.display = 'block';
+      }
+
+      function springe(o) {
+        trefferBox.style.display = 'none';
+        eingabe.value = o.n;
+        eingabe.blur();
+        // Bei Strassen nicht herauszoomen — der Ausschnitt ist ja schon nah dran.
+        map.flyTo({ center: [o.lon, o.lat],
+                    zoom: o.strasse ? Math.max(map.getZoom(), 16) : Math.max(map.getZoom(), 12),
+                    speed: 1.4 });
+        if (markierung) markierung.remove();
+        markierung = new maplibregl.Marker({ color: '#a3402f' })
+          .setLngLat([o.lon, o.lat]).setPopup(new maplibregl.Popup().setText(o.n)).addTo(map);
+      }
+
+      // ---- Adressen mit Hausnummern (Dienst /adressen/) ---------------------
+      // Landesweiter Adressindex, der NICHT in den Browser passt: Deutschland
+      // hat rund 30 Millionen Hausnummern. Deshalb fragt das Frontend hier
+      // einen kleinen Dienst nebenan, statt wie beim Ortsindex alles zu laden.
+      //
+      // Bewusst KEIN zweites Bedienfeld: dasselbe Suchfeld fuehrt stufenweise
+      // weiter. Erst Strassen (mit ihrem Ort als Beisatz), nach der Auswahl die
+      // Hausnummern derselben Strasse. Auf dem Handy ist ein Feld, das mitdenkt,
+      // deutlich brauchbarer als drei, die man nacheinander treffen muss.
+      let adressModus = null;      // { id, name, ort } sobald eine Strasse gewaehlt ist
+      let adressPräfix = '';       // was wir selbst ins Feld geschrieben haben
+
+      // Faellt der Dienst aus (oder wird der Index gerade gebaut), liefert die
+      // Suche einfach keine Adressen — die Karte darf daran nicht haengen.
+      const adressAbruf = (pfad) =>
+        fetch('/adressen/' + pfad).then(r => r.ok ? r.json() : []).catch(() => []);
+
+      function verlasseAdressModus() {
+        adressModus = null;
+        adressPräfix = '';
+      }
+
+      function zeigeHausnummern(nummern) {
+        trefferBox.innerHTML = '';
+        auswahl = -1;
+        if (!nummern.length) {
+          const z = document.createElement('div');
+          z.innerHTML = '<b></b><span class="meta"></span>';
+          z.querySelector('b').textContent = 'Keine Hausnummer gefunden';
+          z.querySelector('.meta').textContent = adressModus.name;
+          trefferBox.appendChild(z);
+        }
+        const strasse = adressModus;     // festhalten: springe() raeumt den Modus ab
+        nummern.forEach(h => {
+          const z = document.createElement('div');
+          z.innerHTML = '<b></b><span class="meta"></span>';
+          const beschriftung = strasse.name + ' ' + h.nummer;
+          z.querySelector('b').textContent = beschriftung;
+          z.querySelector('.meta').textContent = strasse.ort;
+          z.onclick = () => {
+            verlasseAdressModus();
+            springe({ n: beschriftung + ', ' + strasse.ort,
+                      lat: h.lat, lon: h.lon, strasse: true });
+          };
+          trefferBox.appendChild(z);
+        });
+        trefferBox.style.display = 'block';
+      }
+
+      function waehleStrasse(st) {
+        adressModus = { id: st.id, name: st.name, ort: st.ort };
+        adressPräfix = st.name + ', ' + st.ort + ' ';
+        eingabe.value = adressPräfix;
+        eingabe.focus();
+        // Gleich die ersten Hausnummern zeigen — sonst wirkt das Feld tot.
+        adressAbruf('nummern?strasse=' + st.id).then(zeigeHausnummern);
+      }
+
+      let tippTimer = null;
+      eingabe.addEventListener('input', () => {
+        clearTimeout(tippTimer);
+        tippTimer = setTimeout(() => {
+          // Leeres Feld heisst nicht „nichts anzuzeigen": dann stehen dort die
+          // gemerkten Orte. Ohne das waere die Merkliste nur ueber Umwege zu
+          // erreichen — und ein Notfallwerkzeug muss man blind treffen koennen.
+          if (!eingabe.value.trim() && !adressModus) { zeigeMerkliste(); return; }
+          // Im Adressmodus: alles hinter „Strasse, Ort " ist die Hausnummer.
+          // Loescht jemand den Praefix weg, ist er wieder in der freien Suche.
+          if (adressModus) {
+            if (eingabe.value.startsWith(adressPräfix)) {
+              const nr = eingabe.value.slice(adressPräfix.length);
+              adressAbruf('nummern?strasse=' + adressModus.id +
+                          '&q=' + encodeURIComponent(nr)).then(zeigeHausnummern);
+              return;
+            }
+            verlasseAdressModus();
+          }
+          const text = eingabe.value;
+          Promise.all([
+            ladeOrte(),
+            text.trim().length >= 2
+              ? adressAbruf('strassen?q=' + encodeURIComponent(text)) : [],
+          ]).then(([, strassen]) => zeige(suche(text), sucheStrassen(text), strassen));
+        }, 160);
+      });
+      eingabe.addEventListener('focus', () => {
+        ladeOrte();
+        if (!eingabe.value.trim()) zeigeMerkliste();
+      });
+      eingabe.addEventListener('keydown', e => {
+        const zeilen = [...trefferBox.children];
+        if (e.key === 'Escape') { trefferBox.style.display = 'none'; eingabe.blur(); return; }
+        if (!zeilen.length) return;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          auswahl = (auswahl + (e.key === 'ArrowDown' ? 1 : zeilen.length - 1)) % zeilen.length;
+          zeilen.forEach((z, i) => z.classList.toggle('aktiv', i === auswahl));
+          zeilen[auswahl].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          zeilen[auswahl >= 0 ? auswahl : 0].click();
+        }
+      });
+      map.on('movestart', () => { trefferBox.style.display = 'none'; });
+
+      // ---- Routenplanung (offline, Valhalla auf LXC 102) ---------------------
+      // Der Dienst liegt auf 192.0.2.10:8002 und ist per Firewall nur fuer
+      // host/node1 erreichbar. Das Frontend spricht ihn deshalb NICHT direkt an,
+      // sondern ueber /route/ — nginx auf node1 proxyt dorthin. Vorteil: gleiche
+      // Herkunft, also kein CORS, und der Browser braucht keinen eigenen Zugang.
+      const ROUTE_API = '/route/';
+
+      const routeBtn = document.getElementById('routebtn');
+      const routeBox = document.getElementById('routebox');
+      const rStart = document.getElementById('rstart');
+      const rZiel = document.getElementById('rziel');
+      const rTreffer = document.getElementById('rtreffer');
+      const rErg = document.getElementById('rerg');
+      const rGo = document.getElementById('rgo');
+      const rWeg = document.getElementById('rweg');
+      let punkte = { rstart: null, rziel: null };
+      let costing = 'auto';
+      let routeMarker = [];
+
+      routeBtn.onclick = () => {
+        const auf = routeBox.style.display === 'block';
+        routeBox.style.display = auf ? 'none' : 'block';
+        routeBtn.classList.toggle('on', !auf);
+        if (auf) { rTrefferAus(); } else { ladeOrte(); }
+      };
+
+      document.querySelectorAll('#rmodi button').forEach(b => {
+        b.onclick = () => {
+          if (costing === b.dataset.c) return;
+          costing = b.dataset.c;
+          document.querySelectorAll('#rmodi button').forEach(x => x.classList.toggle('on', x === b));
+          // ★ Liegt schon eine Route auf der Karte, wird sie sofort neu
+          //   gerechnet. Vorher musste man nach dem Umschalten von Auto auf Rad
+          //   von Hand nachtreten — und sah bis dahin die AUTO-Route, waehrend
+          //   der Knopf „Rad" hervorgehoben war. Das ist keine fehlende
+          //   Bequemlichkeit, sondern eine falsche Anzeige.
+          if (map.getSource('route') && punkte.rstart && punkte.rziel) {
+            routeBerechnen();
+          }
+        };
+      });
+
+      // "Mitte" statt Karten-Klick: auf dem Handy ist ein praeziser Tap schwer,
+      // die Karte laesst sich aber muehelos verschieben. Der Notfall-Modus soll
+      // ohne GPS und ohne Zielgenauigkeit bedienbar bleiben.
+      document.querySelectorAll('.hier').forEach(b => {
+        b.onclick = () => {
+          const c = map.getCenter();
+          const feld = b.dataset.ziel;
+          punkte[feld] = { lat: c.lat, lon: c.lng };
+          document.getElementById(feld).value =
+            `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+          rTrefferAus();
+        };
+      });
+
+      // Beide Eingabefelder teilen sich EINE Trefferliste — zwei getrennte waeren
+      // auf dem Handy zu eng.
+      //
+      // ★★ Genau daraus wurde ein boesartiger Fehler: frueher las der Klick das
+      //    gerade fokussierte Feld aus. Wer den Start eintippte, dann ins
+      //    Ziel-Feld wechselte und aus der noch sichtbaren Liste auswaehlte,
+      //    bekam die Koordinaten des STARTS ins Ziel geschrieben — sichtbar erst
+      //    an einer absurden Fahrzeit. Deshalb jetzt zweifach abgesichert: die
+      //    Liste gehoert fest zu dem Feld, fuer das sie gebaut wurde (`feld`),
+      //    und beim Feldwechsel verschwindet sie.
+      let aktivesFeld = null, rTimer = null, rAdresse = null;
+
+      function rTrefferAus() {
+        rTreffer.style.display = 'none';
+        rAdresse = null;
+      }
+
+      [rStart, rZiel].forEach(inp => {
+        inp.addEventListener('focus', () => {
+          if (aktivesFeld && aktivesFeld !== inp) rTrefferAus();
+          aktivesFeld = inp;
+          ladeOrte();
+        });
+        inp.addEventListener('input', () => {
+          aktivesFeld = inp;
+          clearTimeout(rTimer);
+          rTimer = setTimeout(() => rSuche(inp), 140);
+        });
+      });
+
+      // Hausnummern einer Strasse als Trefferliste aufbereiten.
+      const alsNummernListe = (strasse, nummern) => nummern.map(h => ({
+        n: strasse.name + ' ' + h.nummer, l: strasse.ort, lat: h.lat, lon: h.lon,
+      }));
+
+      function rSuche(inp) {
+        const text = inp.value;
+
+        // Stufe 2: Strasse steht schon im Feld, jetzt wird die Nummer getippt.
+        if (rAdresse && rAdresse.feld === inp && text.startsWith(rAdresse.präfix)) {
+          const nr = text.slice(rAdresse.präfix.length);
+          adressAbruf('nummern?strasse=' + rAdresse.strasse.id +
+                      '&q=' + encodeURIComponent(nr))
+            .then(n => zeigeRoutenTreffer(alsNummernListe(rAdresse.strasse, n), inp));
+          return;
+        }
+        rAdresse = null;
+
+        // Direkte Koordinateneingabe zulassen: "51.32, 7.01"
+        const koord = text.match(/^\s*(-?\d+[.,]\d+)\s*,\s*(-?\d+[.,]\d+)\s*$/);
+        if (koord) {
+          punkte[inp.id] = { lat: parseFloat(koord[1].replace(',', '.')),
+                             lon: parseFloat(koord[2].replace(',', '.')) };
+          rTreffer.style.display = 'none';
+          return;
+        }
+
+        Promise.all([
+          ladeOrte(),
+          text.trim().length >= 2
+            ? adressAbruf('strassen?q=' + encodeURIComponent(text)) : [],
+        ]).then(([, strassen]) => {
+          // Adressen zuerst — ein Fahrziel ist fast immer eine Hausnummer,
+          // nicht ein Ortsmittelpunkt.
+          const adressen = strassen.slice(0, 6).map(st => ({
+            n: st.name, l: st.ort + ' · ' + st.anzahl + ' Hausnummern', adresse: st,
+          }));
+          zeigeRoutenTreffer(
+            adressen.concat(suche(text)).concat(sucheStrassen(text)), inp);
+        });
+      }
+
+      function zeigeRoutenTreffer(liste, feld) {
+        rTreffer.innerHTML = '';
+        if (!liste.length) { rTreffer.style.display = 'none'; return; }
+        liste.slice(0, 10).forEach(o => {
+          const z = document.createElement('div');
+          z.textContent = o.n + (o.l ? ' · ' + o.l : (o.strasse ? ' · Straße im Ausschnitt' : ''));
+          z.onclick = () => {
+            // Eine Strasse ohne Nummer ist noch kein Ziel — eine Stufe weiter.
+            if (o.adresse) {
+              rAdresse = { feld, strasse: o.adresse,
+                           präfix: o.adresse.name + ', ' + o.adresse.ort + ' ' };
+              feld.value = rAdresse.präfix;
+              feld.focus();
+              adressAbruf('nummern?strasse=' + o.adresse.id)
+                .then(n => zeigeRoutenTreffer(alsNummernListe(o.adresse, n), feld));
+              return;
+            }
+            // `feld` statt `aktivesFeld`: die Liste gehoert zu dem Feld, fuer das
+            // sie gebaut wurde. Siehe die Erklaerung oben.
+            punkte[feld.id] = { lat: o.lat, lon: o.lon };
+            feld.value = o.n;
+            rTrefferAus();
+          };
+          rTreffer.appendChild(z);
+        });
+        rTreffer.style.display = 'block';
+      }
+
+      // Valhalla liefert die Geometrie als Polyline mit SECHS Nachkommastellen.
+      // Der verbreitete Google-Decoder rechnet mit fuenf — damit landet die Route
+      // um den Faktor zehn verschoben irgendwo im Nichts.
+      function decodePolyline6(str) {
+        const koord = [];
+        let index = 0, lat = 0, lon = 0;
+        while (index < str.length) {
+          let b, shift = 0, result = 0;
+          do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+          lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+          shift = 0; result = 0;
+          do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+          lon += (result & 1) ? ~(result >> 1) : (result >> 1);
+          koord.push([lon / 1e6, lat / 1e6]);
+        }
+        return koord;
+      }
+
+      const meter = (km) => km >= 1 ? km.toFixed(1).replace('.', ',') + ' km'
+                                    : Math.round(km * 1000) + ' m';
+      const dauer = (s) => {
+        const m = Math.round(s / 60);
+        return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+      };
+
+      // `einpassen` ist beim Planen richtig und waehrend der Fahrt falsch: eine
+      // Neuberechnung wuerde die Kamera sonst mitten im Abbiegen auf die ganze
+      // Strecke zurueckreissen, genau in dem Moment, in dem man hinsieht.
+      let letzteKoordinaten = null;
+      function zeichneRoute(koordinaten, einpassen = true) {
+        letzteKoordinaten = koordinaten;
+        const daten = { type: 'Feature', geometry: { type: 'LineString', coordinates: koordinaten } };
+        if (map.getSource('route')) {
+          map.getSource('route').setData(daten);
+        } else {
+          map.addSource('route', { type: 'geojson', data: daten });
+          // Zwei Linien uebereinander: die breite dunkle darunter gibt der
+          // farbigen Kontrast, sonst verschwindet sie ueber hellen Flaechen.
+          map.addLayer({ id: 'route-rand', type: 'line', source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#1b3a5c', 'line-width': 8, 'line-opacity': .55 } });
+          map.addLayer({ id: 'route-linie', type: 'line', source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': '#3a8ed0', 'line-width': 4.5 } });
+        }
+        routeMarker.forEach(m => m.remove());
+        routeMarker = [
+          new maplibregl.Marker({ color: '#2e7d4f' }).setLngLat(koordinaten[0]).addTo(map),
+          new maplibregl.Marker({ color: '#a3402f' }).setLngLat(koordinaten[koordinaten.length - 1]).addTo(map),
+        ];
+        if (!einpassen) return;
+        const b = koordinaten.reduce((acc, c) => acc.extend(c),
+          new maplibregl.LngLatBounds(koordinaten[0], koordinaten[0]));
+        map.fitBounds(b, { padding: 60, maxZoom: 15 });
+      }
+
+      // Nimmt die Route samt Markierungen von der Karte. Bis 2026-08-25 gab es
+      // dafuer gar keinen Weg: eine einmal gezeichnete Linie blieb liegen, bis
+      // man eine andere berechnete — auch wenn man laengst woanders hinsah.
+      function routeLoeschen() {
+        ['route-linie', 'route-rand'].forEach(id => {
+          if (map.getLayer(id)) map.removeLayer(id);
+        });
+        if (map.getSource('route')) map.removeSource('route');
+        letzteKoordinaten = null;
+        routeMarker.forEach(m => m.remove());
+        routeMarker = [];
+        rErg.innerHTML = '';
+        rWeg.style.display = 'none';
+        naviBeenden();
+        letzteFahrt = null;
+        naviEl.start.style.display = 'none';
+      }
+
+      rWeg.onclick = routeLoeschen;
+
+      function routeBerechnen() {
+        if (!punkte.rstart || !punkte.rziel) {
+          rErg.innerHTML = '<span class="weg">Start und Ziel wählen — tippen, oder „Mitte“ benutzen.</span>';
+          return;
+        }
+        rGo.disabled = true;
+        rErg.innerHTML = '<span class="weg">berechne …</span>';
+        fetch(ROUTE_API + 'route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            locations: [punkte.rstart, punkte.rziel],
+            costing,
+            units: 'kilometers',
+            directions_options: { language: 'de-DE' },
+            // ★ Der Wert ist in METERN — und zwar unabhängig von `units` oben.
+            //   Mit 0.1 liefert Valhalla brav alle 10 Zentimeter einen Wert:
+            //   für Heiligenhaus–Solingen 231.943 Höhenpunkte und rund ein
+            //   Megabyte Antwort für ein Profil von 260 Bildpunkten Breite.
+            //   50 m ergeben dieselbe Kurve bei einem Hundertstel der Daten.
+            //   Liefert Valhalla noch keine Höhen, fehlt das Feld in der
+            //   Antwort einfach und die Auswertung blendet das Profil aus —
+            //   deshalb darf das Feld dauerhaft in der Anfrage stehen.
+            elevation_interval: 50,
+          }),
+        })
+          // Waehrend der Kachelbau laeuft, antwortet nginx mit 502 und HTML —
+          // ein blindes r.json() wuerde dann einen Parser-Fehler anzeigen statt
+          // zu sagen, was wirklich los ist.
+          .then(async r => {
+            const roh = await r.text();
+            let j = null;
+            try { j = JSON.parse(roh); } catch (_) { /* keine JSON-Antwort */ }
+            if (r.ok && j) return j;
+            if (j) return Promise.reject(j);
+            return Promise.reject({ error: r.status === 502 || r.status === 504
+              ? 'Routing-Dienst antwortet nicht — baut er noch die Kacheln?'
+              : `Routing-Dienst meldet HTTP ${r.status}` });
+          })
+          .then(d => {
+            const beine = d.trip.legs;
+            const koord = beine.flatMap(l => decodePolyline6(l.shape));
+            zeichneRoute(koord);
+            const s = d.trip.summary;
+            const schritte = beine.flatMap(l => l.maneuvers || []);
+            rErg.innerHTML =
+              `<div class="kopf">${meter(s.length)} · ${dauer(s.time)}</div>` +
+              hoehenAbschnitt(beine) +
+              '<ol>' + schritte.map(m =>
+                `<li>${escapeHtml(m.instruction || '')}` +
+                (m.length > 0.02 ? ` <span class="weg">(${meter(m.length)})</span>` : '') +
+                '</li>').join('') + '</ol>';
+            rWeg.style.display = 'block';
+            // Die Antwort aufheben statt sie nach dem Zeichnen wegzuwerfen —
+            // sie ist die ganze Grundlage des Folgemodus.
+            letzteFahrt = d.trip;
+            naviEl.start.style.display = schritte.length ? 'block' : 'none';
+          })
+          .catch(e => {
+            // Valhalla antwortet bei "kein Weg gefunden" mit einer eigenen
+            // Fehlerstruktur; die Meldung daraus ist brauchbarer als "Fehler".
+            const txt = (e && (e.error || e.message)) || 'Routing-Dienst nicht erreichbar';
+            rErg.innerHTML = '<span class="weg">' + escapeHtml(String(txt)) + '</span>';
+          })
+          .finally(() => { rGo.disabled = false; });
+      }
+
+      rGo.onclick = routeBerechnen;
+
+      function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      // ================= Navigation (Folgemodus) =============================
+      // Bis hierher war die Route eine Zeichnung mit einer Liste darunter: die
+      // Antwort von Valhalla wurde nach dem Zeichnen weggeworfen. Sie enthaelt
+      // aber alles, was ein Navi braucht — die Manoever tragen
+      // begin_shape_index/end_shape_index, die exakt in die aus
+      // decodePolyline6() gewonnene Punktfolge zeigen, und drei fertige
+      // deutsche Ansagetexte je Manoever (Vorwarnung, jetzt, danach). Es muss
+      // also kein einziger Ansagetext selbst gebaut werden.
+
+      const naviEl = {
+        pfeil: document.getElementById('navipfeil'),
+        entfernung: document.getElementById('navientfernung'),
+        anweisung: document.getElementById('navianweisung'),
+        danach: document.getElementById('navidanach'),
+        rest: document.getElementById('navirest'),
+        zustand: document.getElementById('navizustand'),
+        start: document.getElementById('rnavi'),
+        ende: document.getElementById('naviende'),
+        nacht: document.getElementById('navinacht'),
+      };
+
+      let letzteFahrt = null;     // die rohe Valhalla-Antwort der letzten Route
+      let navi = null;            // Zustand waehrend der Fahrt
+
+      // ---- Geometrie --------------------------------------------------------
+      // Bewusst eine oertliche, ebene Naeherung statt Haversine bei jedem
+      // Punkt: auf einer Route von wenigen hundert Kilometern liegt der Fehler
+      // unter einem Promille, und die Fusspunktsuche laeuft mehrmals je Sekunde.
+      function metrik(lat0) {
+        const mx = Math.cos(lat0 * Math.PI / 180) * 111320;
+        return { x: (ll) => ll[0] * mx, y: (ll) => ll[1] * 110540 };
+      }
+
+      function routeAufbereiten(fahrt) {
+        const koord = [];
+        const manoever = [];
+        fahrt.legs.forEach(l => {
+          const versatz = koord.length;
+          decodePolyline6(l.shape).forEach(k => koord.push(k));
+          // ★ Die Indizes sind je Bein gezaehlt. Beim Aneinanderhaengen mehrerer
+          //   Beine muss der Versatz drauf, sonst zeigen alle Manoever des
+          //   zweiten Beins an den Anfang der Route. Bei zwei Punkten gibt es
+          //   nur ein Bein — der Fehler faellt dann nie auf und schlaegt erst
+          //   zu, wenn jemand einen Zwischenhalt einbaut.
+          (l.maneuvers || []).forEach(m => manoever.push(Object.assign({}, m, {
+            von: versatz + m.begin_shape_index,
+            bis: versatz + m.end_shape_index,
+          })));
+        });
+        const m = metrik(koord[0][1]);
+        const px = koord.map(m.x), py = koord.map(m.y);
+        const kum = [0];
+        for (let i = 1; i < koord.length; i++) {
+          kum[i] = kum[i - 1] + Math.hypot(px[i] - px[i - 1], py[i] - py[i - 1]);
+        }
+        return { koord, manoever, kum, px, py, m, gesamt: kum[kum.length - 1] };
+      }
+
+      // Fusspunkt der Position auf der Strecke. Die Suche laeuft ueber ein
+      // Fenster um den zuletzt bekannten Index — ohne das springt die Position
+      // an gekreuzten Stellen (Kreisverkehr, Autobahnkreuz, Hin- und Rueckweg
+      // auf derselben Strasse) auf den falschen Abschnitt, und die Anzeige
+      // wechselt scheinbar grundlos das Manoever.
+      function fusspunkt(r, pos, vonIdx, bisIdx) {
+        const qx = r.m.x(pos), qy = r.m.y(pos);
+        let best = null;
+        for (let i = Math.max(0, vonIdx); i < Math.min(r.koord.length - 1, bisIdx); i++) {
+          const ax = r.px[i], ay = r.py[i];
+          const bx = r.px[i + 1], by = r.py[i + 1];
+          const dx = bx - ax, dy = by - ay;
+          const len2 = dx * dx + dy * dy;
+          let t = len2 > 0 ? ((qx - ax) * dx + (qy - ay) * dy) / len2 : 0;
+          t = Math.max(0, Math.min(1, t));
+          const fx = ax + t * dx, fy = ay + t * dy;
+          const ab = Math.hypot(qx - fx, qy - fy);
+          if (!best || ab < best.abstand) {
+            best = { i, t, abstand: ab, entlang: r.kum[i] + t * Math.sqrt(len2) };
+          }
+        }
+        return best;
+      }
+
+      // ---- Anzeige ----------------------------------------------------------
+      // Valhallas Manoevertypen auf Pfeile. Unbekanntes wird zum geraden Pfeil,
+      // nicht zu einem falschen — ein erfundener Abbiegepfeil waere schlimmer
+      // als gar keiner.
+      const NAVI_PFEIL = {
+        1: '↑', 2: '↑', 3: '↑', 4: '⚑', 5: '⚑', 6: '⚑',
+        9: '↗', 10: '↱', 11: '⤿', 12: '⤾', 13: '⤾', 14: '↰', 15: '↖',
+        16: '↖', 17: '↑', 18: '↗', 19: '↗', 20: '↗', 21: '↑', 22: '↑',
+        23: '↖', 24: '↗', 25: '↺', 26: '↻', 27: '↻',
+      };
+      const pfeilFuer = (m) => (m && NAVI_PFEIL[m.type]) || '↑';
+
+      function naviEntfernung(meterWert) {
+        if (meterWert < 20) return 'jetzt';
+        if (meterWert < 1000) return Math.round(meterWert / 10) * 10 + ' m';
+        return (meterWert / 1000).toFixed(meterWert < 10000 ? 1 : 0).replace('.', ',') + ' km';
+      }
+
+      // ---- Sprachausgabe ----------------------------------------------------
+      // Drei Stufen, absteigend in Qualitaet und aufsteigend in Verfuegbarkeit.
+      // Der Reihe nach: vorproduzierter Klang aus dem Zwischenspeicher, dann
+      // frisch geholt (nur solange der TTS-Weg erreichbar ist), dann die
+      // eingebaute Stimme des Browsers.
+      // ⚠ Die eingebaute Stimme ist auf diesem Laptop wirkungslos: Firefox
+      //   spricht unter Linux nur ueber speech-dispatcher, und das Paket ist
+      //   nicht installiert. Auf einem Handy traegt sie vollstaendig. Deshalb
+      //   wird geprueft statt angenommen — und wenn keine Stimme da ist, sagt
+      //   die Leiste das, statt einfach zu schweigen.
+      const TTS_API = '/tts/';
+      const KLANG_CACHE = 'navi-ansagen-v1';
+      let klangKlar = null;        // Promise auf den geoeffneten Cache
+      let spracheGeprueft = false, spracheDa = false;
+
+      function stimmeVorhanden() {
+        if (spracheGeprueft) return spracheDa;
+        spracheGeprueft = true;
+        try {
+          spracheDa = !!(window.speechSynthesis &&
+                         speechSynthesis.getVoices().some(v => /^de/i.test(v.lang)));
+        } catch (e) { spracheDa = false; }
+        return spracheDa;
+      }
+
+      async function klangHolen(text) {
+        if (!('caches' in window)) return null;
+        klangKlar = klangKlar || caches.open(KLANG_CACHE);
+        const cache = await klangKlar;
+        const schluessel = TTS_API + '?text=' + encodeURIComponent(text);
+        // ★ Der Schluessel ist der ANSAGETEXT, nicht die Manoevernummer. Gleiche
+        //   Saetze wiederholen sich zwischen Routen ("Der Route folgen.",
+        //   "Links abbiegen."), und so muessen sie nur einmal erzeugt werden.
+        let treffer = await cache.match(schluessel);
+        if (treffer) return treffer.blob();
+        try {
+          const r = await fetch(schluessel, { headers: { 'X-TTS-Engine': 'piper' } });
+          if (!r.ok) return null;
+          await cache.put(schluessel, r.clone());
+          return r.blob();
+        } catch (e) { return null; }
+      }
+
+      let sprechend = false;
+      const sprechListe = [];
+      async function sprechAbarbeiten() {
+        if (sprechend || !sprechListe.length) return;
+        sprechend = true;
+        const text = sprechListe.shift();
+        try {
+          const blob = await klangHolen(text);
+          if (blob) {
+            await new Promise(fertig => {
+              const a = new Audio(URL.createObjectURL(blob));
+              a.onended = a.onerror = () => { URL.revokeObjectURL(a.src); fertig(); };
+              a.play().catch(fertig);
+            });
+          } else if (stimmeVorhanden()) {
+            await new Promise(fertig => {
+              const u = new SpeechSynthesisUtterance(text);
+              u.lang = 'de-DE'; u.rate = 1.05;
+              u.onend = u.onerror = fertig;
+              speechSynthesis.speak(u);
+            });
+          }
+        } catch (e) { /* Stille ist hier kein Grund, die Fahrt abzubrechen */ }
+        sprechend = false;
+        sprechAbarbeiten();
+      }
+      function sprich(text) {
+        if (!text || !navi || navi.stumm) return;
+        sprechListe.push(text);
+        if (sprechListe.length > 3) sprechListe.splice(0, sprechListe.length - 3);
+        sprechAbarbeiten();
+      }
+
+      // Ansagen der Route im Voraus erzeugen, solange der TTS-Weg erreichbar
+      // ist — unterwegs ist er es nicht mehr. Erst die naechsten drei Manoever,
+      // damit man sofort losfahren kann, den Rest im Hintergrund.
+      async function ansagenVorproduzieren(r) {
+        if (!('caches' in window)) return;
+        const texte = [];
+        r.manoever.forEach(m => {
+          [m.verbal_transition_alert_instruction,
+           m.verbal_pre_transition_instruction,
+           m.verbal_post_transition_instruction].forEach(t => { if (t) texte.push(t); });
+        });
+        let erzeugt = 0, misserfolg = 0;
+        for (const t of texte) {
+          if (!navi) return;                       // Fahrt schon beendet
+          const b = await klangHolen(t);
+          if (b) { erzeugt++; navi.klangWeg = true; } else { misserfolg++; }
+          // ★ Gezaehlt wird, was WIRKLICH da ist. Ein Fortschrittsbalken, der
+          //   auch Fehlschlaege mitzaehlt, meldet am Ende "78/78 bereit" und
+          //   kein einziger Klang existiert.
+          if (erzeugt) navi.ansagenStand = `${erzeugt}/${texte.length}`;
+          // Vier Fehlschlaege ohne einen einzigen Erfolg heissen: der Weg ist
+          // zu. Dann nicht 78-mal in denselben Zeitablauf laufen.
+          if (misserfolg >= 4 && !erzeugt) { navi.klangWeg = false; break; }
+          zustandZeigen();
+        }
+        if (navi && !erzeugt) navi.ansagenStand = null;
+        zustandZeigen();
+      }
+
+      function zustandZeigen() {
+        if (!navi) return;
+        const teile = [];
+        if (navi.abweichungen > 0) teile.push('<span class="warn">abseits der Route</span>');
+        if (navi.ansagenStand) {
+          teile.push('Ansagen ' + navi.ansagenStand);
+        } else if (navi.klangWeg === false) {
+          // Ehrlich benennen, welche Stimme gerade spricht — und wenn keine
+          // spricht, das auch sagen. Stille sieht sonst aus wie ein Defekt.
+          teile.push(stimmeVorhanden() ? 'Stimme des Browsers' : '<span class="warn">ohne Sprachausgabe</span>');
+        }
+        naviEl.zustand.innerHTML = teile.join(' · ');
+      }
+
+      // ---- Nachtmodus -------------------------------------------------------
+      // Umgefaerbt wird der VORHANDENE Stil ueber setPaintProperty. Ein zweites
+      // style.json waere die naheliegende Loesung und liefe bei jeder Aenderung
+      // auseinander — man pflegt dann zwei Karten und merkt es erst, wenn eine
+      // Ebene nachts fehlt.
+      const NACHT = [
+        ['background', 'background-color', '#12161b'],
+        ['earth', 'fill-color', '#1a2027'],
+        ['landcover', 'fill-color', '#1d262a'],
+        ['landuse-green', 'fill-color', '#1d262a'],
+        ['water', 'fill-color', '#14232f'],
+        ['waterway', 'line-color', '#14232f'],
+        ['buildings', 'fill-color', '#232a31'],
+        ['roads-minor', 'line-color', '#39424c'],
+        ['roads-medium', 'line-color', '#4a5560'],
+        ['roads-major', 'line-color', '#6b5b3c'],
+        ['roads-highway', 'line-color', '#7d5236'],
+        ['place-locality', 'text-color', '#c9d3dd'],
+        ['place-locality', 'text-halo-color', '#12161b'],
+        ['roads-label', 'text-color', '#9aa5b1'],
+        ['roads-label', 'text-halo-color', '#12161b'],
+        // Die Beschriftungen behalten sonst ihre Tagfarben und leuchten
+        // nachts als bunte Flecken heraus — im Bild sofort zu sehen, im Code
+        // nicht. Das rote POI-Rot war der auffaelligste.
+        ['poi-label-wichtig', 'text-color', '#c98a7a'],
+        ['poi-label-wichtig', 'text-halo-color', '#12161b'],
+        ['poi-label', 'text-color', '#8b93a0'],
+        ['poi-label', 'text-halo-color', '#12161b'],
+        ['water-label', 'text-color', '#6d8ea8'],
+        ['water-label', 'text-halo-color', '#12161b'],
+        ['paths-label', 'text-color', '#7a828d'],
+        ['paths-label', 'text-halo-color', '#12161b'],
+        ['roads-shield', 'text-color', '#c9a06a'],
+        ['roads-shield', 'text-halo-color', '#12161b'],
+        ['hausnummern', 'text-color', '#6a7079'],
+        ['hausnummern', 'text-halo-color', '#12161b'],
+        ['boundaries', 'line-color', '#4a4756'],
+      ];
+      let nachtAn = false, nachtVorher = null;
+      function nachtSchalten(an) {
+        if (an === nachtAn) return;
+        if (an) {
+          nachtVorher = NACHT.map(([id, eig]) => {
+            try { return map.getPaintProperty(id, eig); } catch (e) { return undefined; }
+          });
+          NACHT.forEach(([id, eig, wert]) => {
+            try { map.setPaintProperty(id, eig, wert); } catch (e) { /* Ebene fehlt */ }
+          });
+        } else if (nachtVorher) {
+          NACHT.forEach(([id, eig], k) => {
+            try { map.setPaintProperty(id, eig, nachtVorher[k]); } catch (e) { /* Ebene fehlt */ }
+          });
+        }
+        nachtAn = an;
+        naviEl.nacht.textContent = an ? 'Tag' : 'Nacht';
+      }
+
+      // ---- Bildschirm wachhalten -------------------------------------------
+      let wachSchloss = null;
+      async function wachHalten(an) {
+        try {
+          if (an && 'wakeLock' in navigator) {
+            wachSchloss = await navigator.wakeLock.request('screen');
+          } else if (!an && wachSchloss) {
+            await wachSchloss.release(); wachSchloss = null;
+          }
+        } catch (e) { wachSchloss = null; }
+      }
+      // ★ Der Halt geht beim Wechsel in einen anderen Tab verloren und kommt
+      //   nicht von selbst zurueck. Ohne diese Zeile geht der Bildschirm nach
+      //   dem ersten Blick aufs Handy dauerhaft wieder aus.
+      document.addEventListener('visibilitychange', () => {
+        if (navi && document.visibilityState === 'visible') wachHalten(true);
+      });
+
+      // ---- Der Folgemodus selbst -------------------------------------------
+      function naviStarten() {
+        if (!letzteFahrt) return;
+        if (!navigator.geolocation) { warn('Kein Standortdienst im Browser.'); return; }
+        const r = routeAufbereiten(letzteFahrt);
+        if (r.koord.length < 2 || !r.manoever.length) { warn('Route ohne Manöver.'); return; }
+
+        navi = {
+          r, idx: 0, mIdx: 0, abweichungen: 0, gesagt: {},
+          stumm: false, ansagenStand: null, klangWeg: null,
+          letzterKurs: map.getBearing(), neuberechnung: false, uhr: null,
+          ersteAusrichtung: true, marke: null,
+        };
+        document.body.classList.add('navi');
+        wachHalten(true);
+        zustandZeigen();
+        ansagenVorproduzieren(r);
+
+        // ★ Die Ausrichtung passiert bewusst NICHT hier, sondern in der ersten
+        //   Standortmeldung. Ein easeTo hier wuerde von dem in naviKamera
+        //   sofort abgebrochen — und zwar mittendrin, sodass Neigung und Zoom
+        //   auf einem zufaelligen Zwischenwert stehen bleiben. Genau so sah das
+        //   erste Bild aus: flache Karte, viel zu weit weg, und im Code stand
+        //   scheinbar korrekt pitch 55 und zoom 16.5.
+        navi.uhr = navigator.geolocation.watchPosition(
+          naviPosition,
+          e => { naviEl.anweisung.textContent = 'Standort nicht verfügbar (Code ' + e.code + ')'; },
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+      }
+
+      function naviBeenden() {
+        if (!navi) return;
+        if (navi.uhr !== null) navigator.geolocation.clearWatch(navi.uhr);
+        if (navi.marke) navi.marke.remove();
+        navi = null;
+        sprechListe.length = 0;
+        document.body.classList.remove('navi');
+        nachtSchalten(false);
+        wachHalten(false);
+        map.easeTo({ pitch: 0, duration: 600 });
+      }
+
+      function naviPosition(p) {
+        if (!navi) return;
+        const r = navi.r;
+        const pos = [p.coords.longitude, p.coords.latitude];
+
+        // Fenster um den letzten Index. Gross genug fuer eine Luecke von einer
+        // halben Minute Fahrt, klein genug, um gekreuzte Stellen nicht zu
+        // verwechseln.
+        let f = fusspunkt(r, pos, navi.idx - 20, navi.idx + 400);
+        const genauigkeit = Math.max(10, p.coords.accuracy || 25);
+        const schwelle = Math.max(40, 3 * genauigkeit);
+
+        // Zu weit weg? Einmal ueber die ganze Route suchen — vielleicht sind
+        // wir nur weitergesprungen (Tunnel, Standortverlust), nicht abgebogen.
+        if (!f || f.abstand > schwelle) {
+          const ganz = fusspunkt(r, pos, 0, r.koord.length - 1);
+          if (ganz && ganz.abstand < f.abstand) f = ganz;
+        }
+        if (!f) return;
+        navi.idx = f.i;
+
+        if (f.abstand > schwelle) {
+          navi.abweichungen++;
+          // ★ Erst nach mehreren Messungen in Folge. Ein einzelner Ausreisser
+          //   — und die gibt es unter Bruecken und zwischen Haeusern staendig —
+          //   darf keine Neuberechnung ausloesen. Die Schwelle selbst haengt an
+          //   der gemeldeten Genauigkeit statt fest zu sein: bei 5 m Genauigkeit
+          //   sind 40 m viel, bei 60 m sind sie nichts.
+          if (navi.abweichungen >= 4 && !navi.neuberechnung) naviNeuberechnen(pos);
+        } else if (navi.abweichungen) {
+          navi.abweichungen = 0;
+        }
+
+        // Welches Manoever kommt? Das erste, dessen Beginn noch vor uns liegt.
+        // ★★ Die 10 Meter Zugabe sind nicht Kosmetik. Mit `<= entlang` wurde ein
+        //   Manoever, das GENAU an der aktuellen Position beginnt, sofort als
+        //   erledigt abgehakt — und genau das passiert am Routenanfang:
+        //   Valhalla setzt dort oft zwei Manoever auf denselben Punkt ("Auf X
+        //   Richtung Sueden fahren", dann "Rechts abbiegen um auf X zu
+        //   bleiben"). Die Abbiegung wurde dadurch nie angezeigt. Gemessen an
+        //   einer 7,3-km-Fahrt mit 293 Messungen: 1 von 9 Manoevern fehlte,
+        //   ausgerechnet das erste echte. Die Zugabe deckt zugleich das
+        //   Zittern des Standorts ab — ohne sie kann ein Ausreisser nach vorn
+        //   ein Manoever ueberspringen, und zurueck geht der Zaehler nie.
+        let mi = navi.mIdx;
+        while (mi + 1 < r.manoever.length && r.kum[r.manoever[mi + 1].von] + 10 < f.entlang) mi++;
+        navi.mIdx = mi;
+        const jetzt = r.manoever[mi];
+        const naechst = r.manoever[mi + 1] || null;
+
+        const bisManoever = naechst ? Math.max(0, r.kum[naechst.von] - f.entlang)
+                                    : Math.max(0, r.gesamt - f.entlang);
+        const zeigen = naechst || jetzt;
+
+        naviEl.pfeil.textContent = pfeilFuer(zeigen);
+        naviEl.entfernung.textContent = naviEntfernung(bisManoever);
+        naviEl.anweisung.textContent = (zeigen && zeigen.instruction) || '';
+        const danach = r.manoever[mi + 2];
+        naviEl.danach.textContent = danach ? 'danach: ' + (danach.instruction || '') : '';
+
+        const restM = Math.max(0, r.gesamt - f.entlang);
+        // Restzeit aus dem Verhaeltnis der Reststrecke: Valhallas Zeiten je
+        // Manoever sind Planwerte, die tatsaechliche Geschwindigkeit kennt nur
+        // das Geraet. Beides zu mischen waere genauer, aber auch eine Zahl, die
+        // bei jedem Ampelhalt springt.
+        const restS = r.gesamt > 0 ? (letzteFahrt.summary.time * restM / r.gesamt) : 0;
+        naviEl.rest.textContent = meter(restM / 1000) + ' · ' + dauer(restS) +
+          ' · an ' + new Date(Date.now() + restS * 1000)
+            .toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+        naviAnsagen(jetzt, naechst, bisManoever, p.coords.speed);
+        naviKamera(pos, p.coords.heading, f);
+        zustandZeigen();
+      }
+
+      function naviAnsagen(jetzt, naechst, bisManoever, tempo) {
+        if (!naechst) return;
+        // Geschwindigkeit fuer die Schwellen: die des LAUFENDEN Manoevers aus
+        // Valhallas Plan, weil sie ruhig ist. Der GPS-Wert schwankt und wuerde
+        // die Ansage bei jedem Bremsen verschieben; er dient nur als Rueckfall.
+        let v = (jetzt && jetzt.time > 0) ? (jetzt.length * 1000 / jetzt.time) : null;
+        if (!v || !isFinite(v)) v = (typeof tempo === 'number' && tempo > 1) ? tempo : 8;
+        const schwelleVor = Math.max(250, v * 25);
+        const schwelleJetzt = Math.max(40, v * 6);
+        const merk = navi.gesagt;
+        const k = navi.mIdx + 1;
+
+        if (bisManoever <= schwelleVor && !merk[k + ':vor']) {
+          merk[k + ':vor'] = 1;
+          sprich(naechst.verbal_transition_alert_instruction ||
+                 naechst.verbal_pre_transition_instruction || naechst.instruction);
+        }
+        if (bisManoever <= schwelleJetzt && !merk[k + ':jetzt']) {
+          merk[k + ':jetzt'] = 1;
+          sprich(naechst.verbal_pre_transition_instruction || naechst.instruction);
+        }
+        // "Der Route 7 Kilometer weiter folgen." gehoert hinter das Manoever,
+        // das gerade ausgefuehrt wurde.
+        if (!merk[navi.mIdx + ':nach'] && navi.mIdx > 0) {
+          merk[navi.mIdx + ':nach'] = 1;
+          sprich(jetzt && jetzt.verbal_post_transition_instruction);
+        }
+      }
+
+      function naviKamera(pos, kurs, f) {
+        const r = navi.r;
+        let peilung = (typeof kurs === 'number' && isFinite(kurs)) ? kurs : null;
+        if (peilung === null) {
+          // ★ Im Stand liefert das Geraet keine Peilung. Auf 0 zu springen
+          //   drehte die Karte an jeder roten Ampel nach Norden. Stattdessen
+          //   die Richtung der Strecke am Fusspunkt nehmen — die stimmt auch
+          //   im Stand und ist genau die, in die man gleich weiterfaehrt.
+          const a = r.koord[f.i], b = r.koord[Math.min(f.i + 1, r.koord.length - 1)];
+          const dx = r.m.x(b) - r.m.x(a), dy = r.m.y(b) - r.m.y(a);
+          if (dx || dy) peilung = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+        }
+        if (peilung === null) peilung = navi.letzterKurs;
+        navi.letzterKurs = peilung;
+
+        eigenePositionZeigen(pos, peilung);
+
+        if (navi.ersteAusrichtung) {
+          // ★★ Die Erstausrichtung SPRINGT, sie gleitet nicht. Ein easeTo wird
+          //   von der naechsten Standortmeldung abgebrochen, und zwar mitten in
+          //   der Bewegung — kommen die Meldungen im Sekundentakt und dauert
+          //   die Bewegung 900 ms, bleibt die Neigung bei rund der Haelfte
+          //   stehen und wird nie wieder gesetzt. Gemessen: bei 1100 ms
+          //   Messabstand Neigung 55, bei 500 ms rund 30. Der Fehler haengt
+          //   damit an der Taktung des Geraets — er tritt bei jedem zweiten
+          //   Handy auf und bei keinem Test, der langsam genug misst.
+          //   Danach gehoeren Neigung und Zoom dem Fahrer.
+          map.jumpTo({ center: pos, bearing: peilung, pitch: 55, zoom: 16.5 });
+          navi.ersteAusrichtung = false;
+          return;
+        }
+        map.easeTo({ center: pos, bearing: peilung, duration: 900, essential: true });
+      }
+
+      // Eigene Position als gerichtete Marke. Ohne sie sieht man zwar die
+      // Route, aber nicht, wo auf ihr man steht — und beim ersten Blick aufs
+      // Bild fehlt genau das.
+      function eigenePositionZeigen(pos, peilung) {
+        if (!navi.marke) {
+          const el = document.createElement('div');
+          el.style.cssText = 'width:0;height:0;border-left:11px solid transparent;' +
+            'border-right:11px solid transparent;border-bottom:26px solid #2f6fb5;' +
+            'filter:drop-shadow(0 0 2px rgba(255,255,255,.9));';
+          navi.marke = new maplibregl.Marker({ element: el, rotationAlignment: 'map' })
+            .setLngLat(pos).addTo(map);
+        }
+        navi.marke.setLngLat(pos);
+        navi.marke.setRotation(peilung);
+      }
+
+      function naviNeuberechnen(pos) {
+        navi.neuberechnung = true;
+        naviEl.anweisung.textContent = 'Route wird neu berechnet …';
+        fetch(ROUTE_API + 'route', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            locations: [{ lat: pos[1], lon: pos[0] }, punkte.rziel],
+            costing, units: 'kilometers',
+            directions_options: { language: 'de-DE' },
+          }),
+        }).then(r => r.json()).then(d => {
+          if (!d || !d.trip) throw new Error('keine Route');
+          letzteFahrt = d.trip;
+          const r2 = routeAufbereiten(d.trip);
+          zeichneRoute(r2.koord, false);
+          navi.r = r2; navi.idx = 0; navi.mIdx = 0;
+          navi.gesagt = {}; navi.abweichungen = 0;
+          ansagenVorproduzieren(r2);
+        }).catch(() => {
+          // ★ Ohne Verbindung zum Routing-Dienst geht das nicht — und genau das
+          //   ist unterwegs der Normalfall, solange das Navi-Kit nicht auf dem
+          //   Geraet laeuft. Dann lieber ehrlich sagen als still weiterzeigen,
+          //   was auf der alten Route gerade dran waere.
+          naviEl.anweisung.textContent = 'Abseits der Route — Neuberechnung nicht möglich';
+        }).finally(() => { navi.neuberechnung = false; });
+      }
+
+      naviEl.start.onclick = naviStarten;
+      naviEl.ende.onclick = naviBeenden;
+      naviEl.nacht.onclick = () => nachtSchalten(!nachtAn);
+
+      // Schreibgeschuetzter Blick auf den Kartenzustand — fuer tests/navifahrt.mjs
+      // und fuer die Fehlersuche in der Browserkonsole. Bewusst NUR lesend: die
+      // Pruefung soll die Bedienung benutzen, nicht an ihr vorbei. Ohne das
+      // laesst sich nicht belegen, ob Neigung und Drehung wirklich anliegen —
+      // und genau daran ist die erste Fassung gescheitert, weil sie im Code
+      // richtig aussah.
+      window.kartenZustand = () => ({
+        zoom: +map.getZoom().toFixed(2),
+        neigung: +map.getPitch().toFixed(1),
+        drehung: +map.getBearing().toFixed(1),
+        navi: !!navi,
+        nacht: nachtAn,
+        gelaende: !!map.getTerrain(),
+      });
+
+      // Die Punktfolge der aktuell gezeichneten Route. Die simulierte Fahrt
+      // braucht sie, um GENAU die Strecke abzufahren, die diese Seite berechnet
+      // hat. Fuhr sie ihre eigene, lagen beide Starts rund 30 Meter auseinander
+      // — und ein Manoever 11 Meter hinter dem Start galt dadurch als
+      // uebersprungen, obwohl es korrekt angezeigt worden waere.
+      window.kartenRoute = () => letzteKoordinaten;
+
+      // Was wird an dieser Bildstelle tatsaechlich gezeichnet? Ein Foto zeigt
+      // eine blaue Flaeche, sagt aber nicht, ob sie ein See ist, ein zu breit
+      // gemalter Bach oder ein Darstellungsfehler. Genau daran ist die Suche
+      // nach den falschen Wasserflaechen zuerst haengengeblieben: die Deutung
+      // eines Bildpunktes ist keine Messung. Ebenfalls nur lesend.
+      window.kartenTreffer = (x, y) => map.queryRenderedFeatures([x, y]).map(t => ({
+        ebene: t.layer.id,
+        quellebene: t.layer['source-layer'] || null,
+        geometrie: t.geometry.type,
+        art: t.properties.kind || t.properties.class || null,
+        name: t.properties.name || null,
+      }));
+
+      // ---- Höhenprofil zur Route --------------------------------------------
+      // Valhalla liefert `elevation` je Bein, sobald die Routing-Kacheln MIT
+      // Höhendaten gebaut sind. Fehlt das Feld, gibt diese Funktion einen leeren
+      // String zurück und die Routenausgabe sieht aus wie vorher — deshalb darf
+      // `elevation_interval` dauerhaft in der Anfrage stehen.
+      function hoehenAbschnitt(beine) {
+        const roh = beine.flatMap(l => Array.isArray(l.elevation) ? l.elevation : []);
+        const hoehen = roh.filter(h => typeof h === 'number' && isFinite(h));
+        if (hoehen.length < 4) return '';
+
+        // ★ Ohne Höhendaten antwortet Valhalla nicht mit gar nichts, sondern mit
+        //   lauter Nullen. Ein flaches Nullprofil ist keine fehlende Angabe,
+        //   sondern eine falsche — im Bergischen erst recht. Also lieber nichts
+        //   zeigen als eine Ebene behaupten.
+        let min = hoehen.reduce((a, b) => Math.min(a, b), Infinity);
+        let max = hoehen.reduce((a, b) => Math.max(a, b), -Infinity);
+        if (max - min < 0.5) return '';
+
+        // ★★ Glätten, BEVOR summiert wird: die Messpunkte schwanken um
+        //    Zehntelmeter, und die Summe dieser Zappelei ergäbe dreistellige
+        //    Höhenmeter auf ebener Strecke. Gleitendes Mittel über fünf Punkte,
+        //    bei 50-m-Abtastung also über 250 m Strecke.
+        //    Die ausgewiesene Steigung hängt damit von der Glättung ab — das
+        //    ist bei jeder Fahrrad-App so, nur sagt es keine dazu.
+        const glatt = hoehen.map((_, i) => {
+          const teil = hoehen.slice(Math.max(0, i - 2), Math.min(hoehen.length, i + 3));
+          return teil.reduce((a, b) => a + b, 0) / teil.length;
+        });
+
+        // ★★★ Summiert wird über ALLE Punkte, ausgedünnt wird erst danach fürs
+        //     Bild. Andersherum — erst ausdünnen, dann summieren — hinge die
+        //     ausgewiesene Steigung an der Streckenlänge: eine 100-km-Tour
+        //     würde stärker ausgedünnt und käme deshalb mit weniger
+        //     Höhenmetern je Kilometer heraus als dieselbe Strecke einzeln
+        //     berechnet. Gemessen: 343 m gegen 295 m für dieselbe Route,
+        //     je nachdem wie fein abgetastet wurde.
+        let auf = 0, ab = 0;
+        for (let i = 1; i < glatt.length; i++) {
+          const d = glatt[i] - glatt[i - 1];
+          if (d > 0) auf += d; else ab -= d;
+        }
+
+        // Fürs Bild reichen 400 Stützpunkte — mehr als das Profil breit ist,
+        // wäre unsichtbar und stünde trotzdem im Markup.
+        let zeichnung = glatt;
+        if (zeichnung.length > 400) {
+          const schritt = Math.ceil(zeichnung.length / 400);
+          zeichnung = zeichnung.filter((_, i) => i % schritt === 0);
+        }
+
+        const B = 260, H = 46, rand = 3;
+        // Nie flacher als 10 m skalieren, sonst macht die Automatik aus einer
+        // Bodenwelle ein Gebirge.
+        const spanne = Math.max(max - min, 10);
+        const punkt = (h, i) =>
+          `${((i / (zeichnung.length - 1)) * B).toFixed(1)},` +
+          `${(H - rand - ((h - min) / spanne) * (H - 2 * rand)).toFixed(1)}`;
+        const linie = zeichnung.map(punkt).join(' ');
+
+        return `<div class="steig">Anstieg <b>${Math.round(auf)} m</b> · ` +
+               `Abstieg <b>${Math.round(ab)} m</b> · ` +
+               `${Math.round(min)}–${Math.round(max)} m ü. NN</div>` +
+               `<div class="profil"><svg viewBox="0 0 ${B} ${H}" preserveAspectRatio="none">` +
+               `<polygon points="0,${H} ${linie} ${B},${H}" fill="#cfdcea"/>` +
+               `<polyline points="${linie}" fill="none" stroke="#3a6ea5" ` +
+               `stroke-width="1.2" vector-effect="non-scaling-stroke"/>` +
+               '</svg></div>';
+      }
+
+      // ---- Gemerkte Orte ----------------------------------------------------
+      // Bewusst im Browser (localStorage) und nicht auf dem Server: die Karte ist
+      // ein read-only-Dienst ohne Anmeldung, ein Merkzettel pro Geraet passt dazu
+      // besser als ein weiterer Dienst mit Datenhaltung. Zuhause, Arbeit, das
+      // Ferienhaus — solche Orte tippt man sonst bei jeder Route neu.
+      const MERK_SCHLUESSEL = 'karten.gemerkte-orte';
+
+      function merkListe() {
+        try {
+          const roh = JSON.parse(localStorage.getItem(MERK_SCHLUESSEL) || '[]');
+          return Array.isArray(roh) ? roh : [];
+        } catch (e) { return []; }
+      }
+
+      function merkSchreiben(liste) {
+        try {
+          localStorage.setItem(MERK_SCHLUESSEL, JSON.stringify(liste.slice(0, 60)));
+          if (typeof merkKnopfAuffrischen === 'function') merkKnopfAuffrischen();
+        } catch (e) {
+          warn('Ort konnte nicht gemerkt werden — Speicher des Browsers voll oder gesperrt.');
+        }
+      }
+
+      function merkeOrt(name, lat, lon) {
+        const liste = merkListe();
+        // Gleiche Stelle nur einmal: eine Nachkommastelle weniger als die
+        // Anzeige, damit ein leicht verschobener zweiter Druck nicht doppelt.
+        const gleich = (a, b) => Math.abs(a - b) < 0.0002;
+        const vorhanden = liste.findIndex(o => gleich(o.lat, lat) && gleich(o.lon, lon));
+        if (vorhanden >= 0) liste.splice(vorhanden, 1);
+        liste.unshift({ n: name, lat, lon });
+        merkSchreiben(liste);
+      }
+
+      // Stern-Knopf: blass, solange nichts gemerkt ist — dann sieht man auf
+      // einen Blick, dass die Liste leer ist, statt sie vergeblich zu oeffnen.
+      const merkBtn = document.getElementById('merkbtn');
+      function merkKnopfAuffrischen() {
+        const n = merkListe().length;
+        merkBtn.classList.toggle('leer', n === 0);
+        merkBtn.title = n ? `Gemerkte Orte (${n})` : 'Noch nichts gemerkt — langer Druck auf die Karte';
+      }
+      merkBtn.onclick = () => {
+        if (!merkListe().length) {
+          trefferBox.innerHTML = '<div class="weg" style="padding:9px 12px">' +
+            'Noch nichts gemerkt. Langer Druck auf die Karte → „Ort merken“.</div>';
+          trefferBox.style.display = 'block';
+          return;
+        }
+        eingabe.value = '';
+        zeigeMerkliste();
+      };
+
+      function zeigeMerkliste() {
+        const liste = merkListe();
+        trefferBox.innerHTML = '';
+        auswahl = -1;
+        merkKnopfAuffrischen();
+        if (!liste.length) {
+          trefferBox.style.display = 'none';
+          return;
+        }
+        liste.forEach((o, i) => {
+          const z = document.createElement('div');
+          z.className = 'merk';
+          z.innerHTML = '<span class="stern">★</span><b></b><span class="meta"></span>' +
+                        '<span class="weg" title="Vergessen">&times;</span>';
+          z.querySelector('b').textContent = o.n;
+          z.querySelector('.meta').textContent =
+            o.lat.toFixed(4) + ', ' + o.lon.toFixed(4);
+          z.querySelector('.weg').onclick = (ev) => {
+            ev.stopPropagation();          // sonst springt die Karte beim Loeschen
+            const l = merkListe();
+            l.splice(i, 1);
+            merkSchreiben(l);
+            zeigeMerkliste();
+          };
+          z.onclick = () => springe(o);
+          trefferBox.appendChild(z);
+        });
+        trefferBox.style.display = 'block';
+      }
+
+      // ---- Kartenmenue (Rechtsklick am Rechner, langer Druck am Handy) ------
+      // Der „Mitte"-Knopf deckt nur die Routenplanung ab. Fuer alles andere
+      // fehlte ein Weg, einen beliebigen Punkt anzufassen — gerade unterwegs
+      // will man auf eine Stelle zeigen, nicht die Karte darunter schieben.
+      const kmenue = document.getElementById('kmenue');
+
+      function menueSchliessen() { kmenue.style.display = 'none'; }
+
+      function menueOeffnen(punkt, lngLat) {
+        const lat = lngLat.lat, lon = lngLat.lng;
+        const eintraege = [
+          ['Route von hier', () => routenpunktSetzen('rstart', lat, lon)],
+          ['Route hierhin', () => routenpunktSetzen('rziel', lat, lon)],
+          ['Ort merken', () => {
+            const name = prompt('Name für diesen Ort:',
+                                lat.toFixed(4) + ', ' + lon.toFixed(4));
+            if (name === null) return;
+            merkeOrt(name.trim() || (lat.toFixed(4) + ', ' + lon.toFixed(4)), lat, lon);
+            // Rueckmeldung, wo der Ort gelandet ist — sonst merkt man ihn und
+            // sieht danach nichts, was sich geaendert haette.
+            hud.textContent = 'Gemerkt — über den Stern ★ neben der Suche';
+          }],
+          ['Koordinaten kopieren', () => koordinatenKopieren(lat, lon)],
+          ['Wie weit komme ich?', () => erreichbarkeitZeigen(lat, lon)],
+        ];
+        if (map.getLayer('erreichbar-flaeche')) {
+          eintraege.push(['Erreichbarkeit ausblenden', erreichbarkeitLoeschen]);
+        }
+        kmenue.innerHTML = '<div class="kopf">' +
+          lat.toFixed(5) + ', ' + lon.toFixed(5) + '</div>';
+        eintraege.forEach(([text, tun]) => {
+          const b = document.createElement('button');
+          b.textContent = text;
+          b.onclick = () => { menueSchliessen(); tun(); };
+          kmenue.appendChild(b);
+        });
+        // Am rechten/unteren Rand nach innen klappen, sonst steht das Menue
+        // halb ausserhalb des Bildschirms.
+        kmenue.style.display = 'block';
+        const breite = kmenue.offsetWidth, hoehe = kmenue.offsetHeight;
+        kmenue.style.left = Math.max(4, Math.min(punkt.x, window.innerWidth - breite - 4)) + 'px';
+        kmenue.style.top = Math.max(4, Math.min(punkt.y, window.innerHeight - hoehe - 4)) + 'px';
+      }
+
+      // ---- Erreichbarkeit (Isochronen) --------------------------------------
+      // Valhalla rechnet die Flaeche, die man in einer gegebenen Zeit erreicht.
+      // Das kostet keine eigenen Daten und keinen Bau — der Routing-Dienst kann
+      // es, seit es ihn gibt; es hat nur nie jemand danach gefragt. Seit die
+      // Kacheln Hoehendaten tragen, ist der Radius fuer Rad und Fuss auch
+      // ehrlich: bergauf kommt man weniger weit.
+      const ERREICHBAR_ZEITEN = {
+        auto: [10, 20, 30],
+        bicycle: [10, 20, 30],
+        pedestrian: [5, 10, 20],
+      };
+
+      function erreichbarkeitLoeschen() {
+        ['erreichbar-flaeche', 'erreichbar-rand'].forEach(id => {
+          if (map.getLayer(id)) map.removeLayer(id);
+        });
+        if (map.getSource('erreichbar')) map.removeSource('erreichbar');
+      }
+
+      function erreichbarkeitZeigen(lat, lon) {
+        const zeiten = ERREICHBAR_ZEITEN[costing] || [10, 20, 30];
+        const art = { auto: 'Auto', bicycle: 'Rad', pedestrian: 'zu Fuß' }[costing] || costing;
+        hud.textContent = `Erreichbarkeit ${art} …`;
+        fetch(ROUTE_API + 'isochrone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            locations: [{ lat, lon }],
+            costing,
+            contours: zeiten.map(t => ({ time: t })),
+            polygons: true,
+            // Ohne diese beiden wird die Flaeche ein Netz aus tausenden
+            // Zipfeln entlang jeder Sackgasse — unlesbar und schwer zu zeichnen.
+            denoise: 0.4,
+            generalize: 30,
+          }),
+        })
+          .then(async r => {
+            const roh = await r.text();
+            let j = null;
+            try { j = JSON.parse(roh); } catch (_) { /* keine JSON-Antwort */ }
+            if (r.ok && j) return j;
+            return Promise.reject({ error: (j && j.error) ||
+              (r.status === 502 || r.status === 504
+                ? 'Routing-Dienst antwortet nicht'
+                : `Routing-Dienst meldet HTTP ${r.status}`) });
+          })
+          .then(daten => {
+            erreichbarkeitLoeschen();
+            // ★ Valhalla liefert die Ringe von der groessten Kontur zur
+            //   kleinsten. Gezeichnet wird in Listenreihenfolge, also muss die
+            //   kleinste zuletzt kommen — sonst deckt die 30-Minuten-Flaeche
+            //   die 10-Minuten-Flaeche zu und alles sieht gleich weit aus.
+            const teile = (daten.features || [])
+              .slice()
+              .sort((a, b) => (b.properties.contour || 0) - (a.properties.contour || 0));
+            if (!teile.length) {
+              hud.textContent = 'keine Fläche berechnet';
+              return;
+            }
+            map.addSource('erreichbar', {
+              type: 'geojson',
+              data: { type: 'FeatureCollection', features: teile },
+            });
+            const klein = Math.min(...zeiten), gross = Math.max(...zeiten);
+            map.addLayer({
+              id: 'erreichbar-flaeche', type: 'fill', source: 'erreichbar',
+              paint: {
+                'fill-color': ['interpolate', ['linear'], ['get', 'contour'],
+                               klein, '#2f6fb5', gross, '#a9c8e4'],
+                'fill-opacity': 0.28,
+              },
+            }, erstesSymbol());
+            map.addLayer({
+              id: 'erreichbar-rand', type: 'line', source: 'erreichbar',
+              paint: {
+                'line-color': ['interpolate', ['linear'], ['get', 'contour'],
+                               klein, '#24568c', gross, '#7ba5cd'],
+                'line-width': 1.4,
+              },
+            }, erstesSymbol());
+            hud.textContent = `${art}: ${zeiten.join(' / ')} Minuten`;
+          })
+          .catch(e => {
+            const txt = (e && (e.error || e.message)) || 'Erreichbarkeit fehlgeschlagen';
+            hud.textContent = String(txt);
+          });
+      }
+
+      function routenpunktSetzen(feld, lat, lon) {
+        punkte[feld] = { lat, lon };
+        document.getElementById(feld).value = lat.toFixed(5) + ', ' + lon.toFixed(5);
+        routeBox.style.display = 'block';
+        routeBtn.classList.add('on');
+      }
+
+      function koordinatenKopieren(lat, lon) {
+        const text = lat.toFixed(5) + ', ' + lon.toFixed(5);
+        // Die Zwischenablage gibt es nur im sicheren Kontext. Ohne HTTPS bleibt
+        // sie stumm — dann lieber sichtbar hinschreiben als so tun, als ginge es.
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text)
+            .then(() => zeigen('Koordinaten kopiert: <code>' + text + '</code>'))
+            .catch(() => zeigen('Kopieren abgelehnt. Koordinaten: <code>' + text + '</code>'));
+        } else {
+          zeigen('Zwischenablage nur über HTTPS. Koordinaten: <code>' + text + '</code>');
+        }
+      }
+
+      map.on('contextmenu', e => { e.preventDefault && e.preventDefault(); menueOeffnen(e.point, e.lngLat); });
+      map.on('movestart', menueSchliessen);
+      map.on('click', menueSchliessen);
+
+      // Langer Druck am Handy: MapLibre kennt dafuer kein eigenes Ereignis, und
+      // 'contextmenu' loest auf Touch nicht zuverlaessig aus. Deshalb selbst
+      // messen — abgebrochen, sobald der Finger wandert (dann wird geschoben)
+      // oder ein zweiter Finger dazukommt (dann wird gezoomt).
+      let druckTimer = null, druckStart = null;
+      map.on('touchstart', e => {
+        if (e.points && e.points.length > 1) { clearTimeout(druckTimer); return; }
+        druckStart = e.point;
+        clearTimeout(druckTimer);
+        druckTimer = setTimeout(() => menueOeffnen(e.point, e.lngLat), 550);
+      });
+      map.on('touchmove', e => {
+        if (!druckStart || !e.point) return;
+        const weit = Math.abs(e.point.x - druckStart.x) > 12 ||
+                     Math.abs(e.point.y - druckStart.y) > 12;
+        if (weit) clearTimeout(druckTimer);
+      });
+      map.on('touchend', () => clearTimeout(druckTimer));
+
+      // ---- Start und Ziel tauschen -----------------------------------------
+      document.getElementById('rtausch').onclick = () => {
+        const merk = punkte.rstart;
+        punkte.rstart = punkte.rziel;
+        punkte.rziel = merk;
+        const text = rStart.value;
+        rStart.value = rZiel.value;
+        rZiel.value = text;
+        rTrefferAus();
+      };
+
+      // In den Routenfeldern dieselbe Merkliste anbieten wie in der Ortssuche.
+      [rStart, rZiel].forEach(inp => {
+        inp.addEventListener('focus', () => {
+          if (inp.value.trim()) return;
+          const liste = merkListe();
+          if (!liste.length) return;
+          zeigeRoutenTreffer(liste.map(o => ({ n: '★ ' + o.n, lat: o.lat, lon: o.lon })), inp);
+        });
+      });
+
+      // ---- Bildebenen: Satellit (DE+NL) und Luftbild (NRW, sehr scharf) -----
+      // Beides sind Rasterkacheln in .pmtiles, genauso per HTTP-Range gelesen wie
+      // die Vektorkarte. Sie ERSETZEN die Karte nicht, sie legen sich darueber:
+      // ausserhalb des abgedeckten Gebiets existiert schlicht keine Kachel, dort
+      // bleibt die normale Karte stehen. Deshalb ist der Uebergang vom Luftbild
+      // (20x20 km um Heiligenhaus) zur Umgebung kein Loch, sondern Karte.
+      const BILDEBENEN = [
+        { id: 'satellit', label: 'Satellit',
+          quellen: [{ name: 'bild-satellit', datei: 'satellit.pmtiles' }],
+          hinweis: 'Sentinel-2 cloudless &copy; EOX IT Services GmbH ' +
+                   '(CC BY-NC-SA 4.0), enth&auml;lt modifizierte Copernicus-Sentinel-Daten' },
+        { id: 'luftbild', label: 'Luftbild',
+          // Die Scharf-Inseln liegen ueber der Flaeche und beginnen erst bei
+          // z19 — MapLibre zeigt dadurch von selbst die schaerfere Aufnahme,
+          // wo es sie gibt. Zwei davon: Heiligenhaus und Solingen-Mitte.
+          // ★ NOTBEHELF minzoom 14, bis die Bilder mit Alphakanal neu gebaut
+          //   sind: die Kacheln sind JPEG und koennen keine Transparenz tragen,
+          //   deshalb ist alles ausserhalb des Datenrechtecks mit Schwarz
+          //   aufgefuellt. Gemessen sind die z11-Randkacheln zu 82-99 % schwarz
+          //   (eine Kachel ist dort 19 km breit), was als dicker schwarzer
+          //   Rahmen um das Luftbild erscheint. Ab z14 ist eine Kachel 2,4 km
+          //   breit und der Saum faellt nicht mehr auf. Darunter zeigt die
+          //   Karte einfach Karte oder Satellit. Nach dem Neubau entfaellt die
+          //   Zeile — dann traegt jede Kachel Alpha und der Rand ist echt weg.
+          quellen: [{ name: 'bild-umland',   datei: 'umland.pmtiles',   minzoom: 14 },
+                    { name: 'bild-stadt',    datei: 'stadt.pmtiles',    minzoom: 19 },
+                    { name: 'bild-solingen', datei: 'solingen.pmtiles', minzoom: 19 }],
+          hinweis: 'Luftbilder &copy; Land NRW (dl-de/zero-2-0), opengeodata.nrw.de' },
+      ];
+      const bildsel = document.getElementById('bildsel');
+      let bildmodus = null;                 // null = reine Karte
+
+      function bildebeneEinhaengen() {
+        const eb = BILDEBENEN.find(b => b.id === bildmodus);
+        if (!eb) return;
+        // ★ Nicht ganz nach oben haengen, sondern UNTER die erste
+        //   Beschriftungsebene: das Bild deckt Flaechen und Strassen zu, die
+        //   Orts- und Strassennamen bleiben aber darueber lesbar. Ganz oben
+        //   waere das Luftbild eine schoene, aber namenlose Flaeche.
+        let beschriftung;
+        try {
+          beschriftung = map.getStyle().layers.find(l => l.type === 'symbol');
+        } catch (e) { return; }             // Stil gerade im Wechsel
+        eb.quellen.forEach(q => {
+          if (!map.getSource(q.name)) {
+            map.addSource(q.name, {
+              type: 'raster', tileSize: 256,
+              url: 'pmtiles://' + location.origin + '/maps/' + q.datei,
+              attribution: eb.hinweis,
+            });
+          }
+          if (!map.getLayer(q.name)) {
+            const ebene = { id: q.name, type: 'raster', source: q.name };
+            if (q.minzoom) ebene.minzoom = q.minzoom;
+            map.addLayer(ebene, beschriftung && beschriftung.id);
+          }
+        });
+      }
+
+      function bildebeneEntfernen() {
+        BILDEBENEN.flatMap(b => b.quellen).forEach(q => {
+          if (map.getLayer(q.name)) map.removeLayer(q.name);
+          if (map.getSource(q.name)) map.removeSource(q.name);
+        });
+      }
+
+      function setzeBildmodus(id) {
+        bildebeneEntfernen();
+        bildmodus = id;
+        // Die Grenze liegt generell bei 20 (siehe Kommentar am Map-Aufruf) und
+        // wird beim Moduswechsel nur wiederhergestellt, nicht mehr je nach
+        // Bildebene gesenkt.
+        map.setMaxZoom(20);
+        if (id) bildebeneEinhaengen();
+        [...bildsel.children].forEach(c =>
+          c.classList.toggle('on', c.dataset.id === (id || 'karte')));
+      }
+
+      // ★ setStyle (Regionswechsel) wirft alle selbst gelegten Ebenen weg.
+      //   Ohne dieses Wiedereinhaengen verschwaende das Luftbild lautlos, sobald
+      //   jemand die Kartenregion umschaltet. Dasselbe gilt fuer Gelaende und
+      //   Gebaeude — und beim Gelaende faellt es besonders auf, weil die Karte
+      //   gekippt bleibt und dabei flach wird.
+      map.on('styledata', () => {
+        if (bildmodus) bildebeneEinhaengen();
+        reliefWiederherstellen();
+      });
+
+      // Nur anbieten, was wirklich da ist — die Bilddaten entstehen in langen
+      // Rechenlaeufen und fehlen zwischendurch.
+      Promise.all(BILDEBENEN.map(eb =>
+        Promise.all(eb.quellen.map(q =>
+          fetch('/maps/' + q.datei, { method: 'HEAD' })
+            .then(r => r.ok).catch(() => false)
+        )).then(da => {
+          // Die Feinstufe darf fehlen, ohne die Grobstufe mitzureissen: solange
+          // umland.pmtiles da ist, ist „Luftbild" benutzbar.
+          eb.quellen = eb.quellen.filter((q, i) => da[i]);
+          return eb.quellen.length ? eb : null;
+        })
+      )).then(verfuegbar => {
+        const da = verfuegbar.filter(Boolean);
+        if (!da.length) return;              // keine Bilddaten -> kein Umschalter
+        bildsel.style.display = 'block';
+        [{ id: null, label: 'Karte' }].concat(da).forEach(eb => {
+          const b = document.createElement('button');
+          b.textContent = eb.label;
+          b.dataset.id = eb.id || 'karte';
+          b.className = eb.id ? '' : 'on';
+          b.onclick = () => setzeBildmodus(eb.id);
+          bildsel.appendChild(b);
+        });
+      });
+
+      // ---- Relief: 3D-Gelaende und Gebaeudehoehen ---------------------------
+      // Zwei unabhaengige Schalter auf zwei Dateien:
+      //   gelaende.pmtiles  Hoehenraster aus DGM1 (1 m Raster), Terrarium-kodiert
+      //   gebaeude.pmtiles  LoD2-Grundrisse mit Firsthoehe je Gebaeude
+      //
+      // ★ `encoding: 'terrarium'` ist PFLICHT und wird NICHT aus der Datei
+      //   gelesen. MapLibres Vorgabe ist die Mapbox-Kodierung, und die rechnet
+      //   dieselben Bytes voellig anders um: aus 200 m Hoehe wuerden rund
+      //   1,3 Millionen. Das Ergebnis ist keine leichte Verzerrung, sondern eine
+      //   senkrechte Nadelwand — auffaellig, aber die Ursache sieht man ihr nicht an.
+      const RELIEF_QUELLE = 'gelaende';
+      const GEB_QUELLE = 'gebaeude';
+      let gelaendeAn = false, gebaeudeAn = false;
+
+      function erstesSymbol() {
+        try {
+          const l = map.getStyle().layers.find(x => x.type === 'symbol');
+          return l && l.id;
+        } catch (e) { return undefined; }
+      }
+
+      function gelaendeEinhaengen() {
+        if (!map.getSource(RELIEF_QUELLE)) {
+          map.addSource(RELIEF_QUELLE, {
+            type: 'raster-dem',
+            url: 'pmtiles://' + location.origin + '/maps/gelaende.pmtiles',
+            // 256 statt der MapLibre-Vorgabe 512: so sind die Kacheln gebaut.
+            // Stimmt das nicht, ist das Gelaende um Faktor zwei verschoben.
+            tileSize: 256,
+            encoding: 'terrarium',
+            attribution: 'H&ouml;hendaten &copy; Land NRW (dl-de/zero-2-0)',
+          });
+        }
+        // Schummerung auch in der flachen Ansicht: sie zeigt die Taeler des
+        // Bergischen schon von oben, ohne dass man kippen muss.
+        if (!map.getLayer('schummerung')) {
+          map.addLayer({
+            id: 'schummerung', type: 'hillshade', source: RELIEF_QUELLE,
+            paint: {
+              'hillshade-exaggeration': 0.45,
+              'hillshade-shadow-color': '#5b6a72',
+              'hillshade-highlight-color': '#fffdf8',
+            },
+          }, erstesSymbol());
+        }
+        map.setTerrain({ source: RELIEF_QUELLE, exaggeration: 1.3 });
+      }
+
+      function gelaendeEntfernen() {
+        map.setTerrain(null);
+        if (map.getLayer('schummerung')) map.removeLayer('schummerung');
+        // Quelle stehen lassen: sie wird von der Hoehenanzeige weiterbenutzt
+        // und ein erneutes Einschalten geht dann ohne Nachladen.
+      }
+
+      function gebaeudeEinhaengen() {
+        // ★ ZWEI Gebäudequellen, bewusst übereinander:
+        //   Das LoD2-Modell ist genauer und vollständig — aber nur für die
+        //   gebaute Fläche. Wer nach Köln oder Berlin scrollt, hätte dort gar
+        //   keine Gebäude. Die Vektorkarte führt für ganz DE+NL ein `height`-
+        //   Feld (in unserer Region bei 17 % der Gebäude gefüllt, anderswo
+        //   mehr). Die OSM-Lage liegt deshalb UNTEN und trägt die Fläche;
+        //   das LoD2-Modell liegt darüber und gewinnt, wo es existiert.
+        if (!map.getLayer('gebaeude-osm')) {
+          map.addLayer({
+            id: 'gebaeude-osm', type: 'fill-extrusion', source: 'protomaps',
+            'source-layer': 'buildings', minzoom: 14,
+            filter: ['has', 'height'],
+            paint: {
+              'fill-extrusion-color': '#ded7cd',
+              'fill-extrusion-height': ['get', 'height'],
+              // min_height trägt Bauteile, die erst über Grund beginnen
+              // (Vordächer, aufgeständerte Etagen). Fehlt es, ist 0 richtig.
+              'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
+              'fill-extrusion-opacity': 0.9,
+            },
+          }, erstesSymbol());
+        }
+        if (!map.getSource(GEB_QUELLE)) {
+          map.addSource(GEB_QUELLE, {
+            type: 'vector',
+            url: 'pmtiles://' + location.origin + '/maps/gebaeude.pmtiles',
+            attribution: 'Geb&auml;udemodelle &copy; Land NRW (dl-de/zero-2-0)',
+          });
+        }
+        if (!map.getLayer('gebaeude-3d')) {
+          map.addLayer({
+            id: 'gebaeude-3d', type: 'fill-extrusion', source: GEB_QUELLE,
+            'source-layer': 'gebaeude',
+            // Unter z14 waeren Gebaeude wenige Bildpunkte gross — sichtbar
+            // waere davon nichts, geladen alles.
+            minzoom: 14,
+            paint: {
+              'fill-extrusion-color': [
+                // Hohe Gebaeude etwas kuehler: das gibt der Silhouette Tiefe,
+                // ohne bunt zu werden.
+                'interpolate', ['linear'], ['get', 'hoehe'],
+                3, '#e0d9d0', 12, '#cfc7bd', 30, '#b9b3ac',
+              ],
+              'fill-extrusion-height': ['get', 'hoehe'],
+              'fill-extrusion-base': 0,
+              // Beim Einblenden weich aufziehen statt hart erscheinen.
+              'fill-extrusion-opacity': 0.92,
+            },
+          }, erstesSymbol());
+        }
+      }
+
+      function gebaeudeEntfernen() {
+        if (map.getLayer('gebaeude-3d')) map.removeLayer('gebaeude-3d');
+        if (map.getLayer('gebaeude-osm')) map.removeLayer('gebaeude-osm');
+      }
+
+      function reliefWiederherstellen() {
+        if (gelaendeAn) gelaendeEinhaengen();
+        if (gebaeudeAn) gebaeudeEinhaengen();
+      }
+
+      function schalteGelaende(an) {
+        gelaendeAn = an;
+        if (an) {
+          gelaendeEinhaengen();
+          // Flach betrachtet sieht 3D-Gelaende aus wie gar nichts. Einmal
+          // kippen macht den Sinn sofort sichtbar — aber nur, wenn der Nutzer
+          // die Kamera nicht schon selbst eingestellt hat.
+          if (map.getPitch() < 10) map.easeTo({ pitch: 55, duration: 800 });
+        } else {
+          gelaendeEntfernen();
+          if (map.getPitch() > 10) map.easeTo({ pitch: 0, duration: 600 });
+        }
+      }
+
+      function schalteGebaeude(an) {
+        gebaeudeAn = an;
+        an ? gebaeudeEinhaengen() : gebaeudeEntfernen();
+        // Gebaeude ohne Kippen sind nur graue Flecken.
+        if (an && map.getPitch() < 10) map.easeTo({ pitch: 55, duration: 800 });
+      }
+
+      // Nur anbieten, was gebaut ist — die Datensaetze entstehen in langen
+      // Rechenlaeufen und fehlen zwischendurch.
+      const reliefsel = document.getElementById('reliefsel');
+      Promise.all([
+        fetch('/maps/gelaende.pmtiles', { method: 'HEAD' }).then(r => r.ok).catch(() => false),
+        fetch('/maps/gebaeude.pmtiles', { method: 'HEAD' }).then(r => r.ok).catch(() => false),
+      ]).then(([hatGelaende, hatGebaeude]) => {
+        if (!hatGelaende && !hatGebaeude) return;
+        reliefsel.style.display = 'block';
+        const knopf = (text, titel, schalter) => {
+          const b = document.createElement('button');
+          b.textContent = text;
+          b.title = titel;
+          b.onclick = () => { const an = !b.classList.contains('on');
+                              b.classList.toggle('on', an); schalter(an); };
+          reliefsel.appendChild(b);
+        };
+        if (hatGelaende) knopf('Gelände', 'Höhenrelief und Schummerung', schalteGelaende);
+        if (hatGebaeude) knopf('Gebäude', 'Gebäudehöhen aus dem Landesmodell', schalteGebaeude);
+      });
+
+      // ---- POI-Sichten: was frueh sichtbar ist, ist eine Entscheidung -------
+      // Die Karte kann nicht alles zugleich zeigen. `poi-label-wichtig` bringt
+      // eine kleine Liste schon ab z14, alles Uebrige erst ab z16. Diese
+      // Grundliste ist Daseinsvorsorge (Klinik, Apotheke, Feuerwehr, Tankstelle,
+      // Haltestelle) und stammt aus der Herkunft des Portals als Offline-Wissen
+      // fuer den Fall, dass das Netz weg ist. Eine Universitaet lag darin
+      // gleichauf mit einem Spielzeugladen: beide erst ab z16.
+      //
+      // Die Sichten LEGEN NUR NACH, sie tauschen nicht: wer „Bildung" waehlt,
+      // sieht Hochschulen und Museen genauso frueh und verliert dabei kein
+      // Krankenhaus. Ein Tausch waere die schlechtere Wahl, weil man den Verlust
+      // erst bemerkt, wenn man das Fehlende sucht.
+      //
+      // ★ Die Listen stehen in style.json (`metadata.poi-sichten`), nicht hier.
+      //   Nur so liest tests/poi-arten.py sie mit und meldet Arten, die es in
+      //   den Kacheln gar nicht gibt. Genau daran hing der Fund vom 2026-09-06:
+      //   `bus_stop`, `atm`, `drinking_water` und `water_point` standen in der
+      //   Grundliste und kommen in 10393 gemessenen Objekten kein einziges Mal
+      //   vor. Haltestellen heissen bei Protomaps `platform` (647 Treffer).
+      const poisel = document.getElementById('poisel');
+      const poiMeta = (style.metadata || {})['poi-sichten'] || {};
+      const POI_SICHTEN = poiMeta.sichten || [];
+      // Die Grundliste wird aus dem Stil GELESEN, nicht hier abgeschrieben:
+      // eine zweite Kopie wuerde beim naechsten Eingriff still auseinanderlaufen.
+      const grundArten = (() => {
+        const l = (style.layers || []).find(x => x.id === 'poi-label-wichtig');
+        const m = l && (l.filter || []).find(t => Array.isArray(t) && t[0] === 'match');
+        return (m && Array.isArray(m[2])) ? m[2] : [];
+      })();
+      let poiSicht = 'notfall';
+      try { poiSicht = localStorage.getItem('poi-sicht') || 'notfall'; } catch (e) {}
+      // ★★ Die spaete Ebene beginnt laut Stil erst bei z16. Fuer „Alles" reicht
+      //    es deshalb NICHT, ihren Filter zu oeffnen: bei z15 wird sie gar nicht
+      //    gezeichnet, und „Alles" sah dort Pixel fuer Pixel aus wie „Notfall"
+      //    (gemessen 2026-09-06 an einem Pruefbild, das genau deshalb entstand).
+      //    Die Grenze muss also mitwandern. Beide Werte werden aus dem Stil
+      //    gelesen, damit eine spaetere Aenderung dort hier nicht vorbeilaeuft.
+      const poiZoom = (id, vorgabe) => {
+        const l = (style.layers || []).find(x => x.id === id);
+        return (l && typeof l.minzoom === 'number') ? l.minzoom : vorgabe;
+      };
+      const POI_SPAET = poiZoom('poi-label', 16);
+      const POI_FRUEH = poiZoom('poi-label-wichtig', 14);
+
+      function poiFilterSetzen() {
+        if (!grundArten.length) return;
+        const s = POI_SICHTEN.find(x => x.id === poiSicht);
+        const alles = poiSicht === 'alles';
+        const menge = alles ? grundArten
+                            : [...new Set(grundArten.concat(s ? s.arten : []))];
+        const neu = {
+          'poi-label-wichtig':
+            ['all', ['has', 'name'], ['match', ['get', 'kind'], menge, true, false]],
+          // „Alles" heisst nicht alles auf einmal: die min_zoom-Bedingung bleibt,
+          // sonst stuenden schlagartig alle 342 Arten uebereinander und die
+          // Karte waere unlesbarer als vorher.
+          'poi-label': alles
+            ? ['all', ['has', 'name'], ['<=', ['get', 'min_zoom'], ['zoom']]]
+            : ['all', ['has', 'name'], ['<=', ['get', 'min_zoom'], ['zoom']],
+               ['match', ['get', 'kind'], menge, false, true]],
+        };
+        try {
+          for (const [ebene, filter] of Object.entries(neu)) {
+            // ★★ Nur bei echter Abweichung setzen. `setFilter` loest selbst ein
+            //    `styledata` aus, und dieser Aufruf haengt an genau diesem
+            //    Ereignis: bedingungsloses Setzen waere eine Endlosschleife, die
+            //    sich als hohe Prozessorlast zeigt und nicht als Fehler.
+            if (JSON.stringify(map.getFilter(ebene)) !== JSON.stringify(filter)) {
+              map.setFilter(ebene, filter);
+            }
+          }
+          const grenze = alles ? POI_FRUEH : POI_SPAET;
+          const jetzt = map.getLayer('poi-label');
+          if (jetzt && jetzt.minzoom !== grenze) {
+            map.setLayerZoomRange('poi-label', grenze, 24);
+          }
+        } catch (e) { /* Stil gerade im Wechsel; das naechste styledata setzt nach */ }
+      }
+
+      function setzePoiSicht(id) {
+        poiSicht = id;
+        try { localStorage.setItem('poi-sicht', id); } catch (e) {}
+        poiFilterSetzen();
+        [...poisel.children].forEach(c => c.classList.toggle('on', c.dataset.id === id));
+      }
+
+      if (POI_SICHTEN.length && grundArten.length) {
+        poisel.style.display = 'block';
+        [{ id: 'notfall', label: 'Notfall',
+           titel: 'Nur die Daseinsvorsorge früh zeigen: Klinik, Apotheke, Feuerwehr, '
+                + 'Polizei, Tankstelle, Supermarkt, Bäcker, Bank, Post, Bahnhof, Haltestelle' }]
+          .concat(POI_SICHTEN)
+          .concat([{ id: 'alles', label: 'Alles',
+                     titel: 'Keine Vorauswahl: jede Art erscheint, sobald Protomaps sie vorsieht' }])
+          .forEach(s => {
+            const b = document.createElement('button');
+            b.textContent = s.label;
+            b.title = s.titel || '';
+            b.dataset.id = s.id;
+            b.className = (s.id === poiSicht) ? 'on' : '';
+            b.onclick = () => setzePoiSicht(s.id);
+            poisel.appendChild(b);
+          });
+        poiFilterSetzen();
+        // ★ setStyle (Regionswechsel) setzt die Filter auf die Stil-Vorgabe
+        //   zurueck. Ohne dieses Nachsetzen faellt die gewaehlte Sicht beim
+        //   Regionswechsel lautlos auf „Notfall", waehrend der Knopf weiter
+        //   blau bleibt und Gegenteiliges behauptet.
+        map.on('styledata', poiFilterSetzen);
+      }
+
+      // ---- Einbettung: die Karte als Baustein anderer Anwendungen ----------
+      // Aufruf: /?einbetten=1&markierung=<lat>,<lon>&zoom=16&sicht=alltag
+      //
+      // Gedacht fuer kleine Kartenflaechen in fremden Oberflaechen (etwa die
+      // Adresse eines Kontakts im Kalender). Ueber ein iframe und NICHT ueber
+      // eingebundenes MapLibre, und das ist die eigentliche Entscheidung:
+      //
+      //  * kein CORS. Kacheln, Schriften und Sprites blieben sonst am
+      //    Ursprungsschutz haengen, und man muesste sie fuer jede fremde
+      //    Herkunft freigeben.
+      //  * keine zweite Kopie von MapLibre, pmtiles.js, Schriften und Stil in
+      //    jeder Anwendung, die eine Karte zeigen will.
+      //  * eine Verbesserung hier wirkt ueberall, statt in n Kopien zu altern.
+      //
+      // Die einbettende Seite muss dafuer nur eine Adresse zusammensetzen.
+      const einbett = new URLSearchParams(location.search);
+      if (einbett.get('einbetten') === '1') {
+        document.body.classList.add('einbetten');
+        const teile = (einbett.get('markierung') || '').split(',').map(Number);
+        const zoom = Number(einbett.get('zoom')) || 16;
+        if (teile.length === 2 && teile.every(Number.isFinite)) {
+          const [lat, lon] = teile;
+          // ★ jumpTo statt center/zoom im Konstruktor: die Karte wird mit
+          //   `hash: true` gebaut und uebernimmt beim Start den Adress-Hash.
+          //   Ohne diesen Sprung landete eine Einbettung ohne Hash auf der
+          //   Uebersicht von Deutschland und zeigte einen Marker, den man erst
+          //   suchen muss.
+          map.jumpTo({ center: [lon, lat], zoom });
+          new maplibregl.Marker({ color: '#a3402f' }).setLngLat([lon, lat]).addTo(map);
+          const gross = document.getElementById('groesser');
+          gross.href = `/#${zoom}/${lat}/${lon}`;
+          gross.title = einbett.get('titel') || '';
+        }
+        // Die Sicht laesst sich mitgeben: wer eine Adresse zeigt, will meist
+        // wissen, was drumherum ist, und nicht nur die Daseinsvorsorge.
+        const sicht = einbett.get('sicht');
+        if (sicht && typeof setzePoiSicht === 'function') setzePoiSicht(sicht);
+      }
+
+      // Regionen-Umschalter: nur Regionen anbieten, deren .pmtiles wirklich da ist.
+      const sel = document.getElementById('regionsel');
+      Promise.all(REGIONEN.map(r =>
+        fetch('/maps/' + r.datei, { method: 'HEAD' })
+          .then(res => res.ok ? r : null).catch(() => null)
+      )).then(vorhanden => {
+        const da = vorhanden.filter(Boolean);
+        if (!da.length) { warn('Keine Kartendatei gefunden — extract-maps.sh läuft?'); return; }
+        if (da[0].id !== aktuell.id) {           // bevorzugte Karte fehlt -> umschwenken
+          aktuell = da[0];
+          map.setStyle(styleFuer(aktuell));
+        }
+        if (da.length < 2) return;               // nur eine Karte -> kein Umschalter
+        sel.style.display = 'block';
+        da.forEach(r => {
+          const b = document.createElement('button');
+          b.textContent = r.label;
+          b.className = (r.id === aktuell.id) ? 'on' : '';
+          b.onclick = () => {
+            if (r.id === aktuell.id) return;
+            aktuell = r;
+            // Style tauschen statt Karte neu bauen -> Position/Zoom bleiben erhalten.
+            map.setStyle(styleFuer(r));
+            [...sel.children].forEach(c => c.classList.toggle('on', c === b));
+          };
+          sel.appendChild(b);
+        });
+      });
+    }).catch(() => warn('style.json konnte nicht geladen werden.'));
+  </script>
+</body>
+</html>

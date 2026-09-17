@@ -1,0 +1,18 @@
+# Abhaengigkeits-Ueberwachung fuer den oeffentlichen Snapshot.
+#
+# Monatlich statt woechentlich und mit kleinem Limit: sicherheitsrelevante
+# Updates schickt Dependabot ohnehin sofort, unabhaengig vom Zeitplan. Reine
+# Versions-PRs sollen sich nicht schneller stapeln, als sie jemand durchsieht.
+#
+# Nur docker: das Frontend bringt keine Paketverwaltung mit (die Fremd-Assets
+# werden per fetch-assets.sh geholt), und der Adressdienst kommt mit der
+# Standardbibliothek aus.
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directory: "/adressen"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"

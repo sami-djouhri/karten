@@ -1,0 +1,104 @@
+services:
+  karten:
+    image: nginx:1.27-alpine
+    container_name: karten
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    volumes:
+      - ./static:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Offline-Kartendaten (pmtiles) liegen im knowledge-vault neben Kiwix,
+      # bewusst NICHT im Git-Repo (mehrere GB, reproduzierbar via extract-maps.sh).
+      - /home/user/knowledge-vault/maps:/usr/share/nginx/html/maps:ro
+    # Bewusstes LAN-IP-Binding wie kiwix (:8140)/calibre (:8141): Handy-Zugriff
+    # im WLAN, read-only, kein Login. Konsistent mit dem Offline-Wissens-Stack.
+    # 8142 ist auf node1 belegt (herb) -> 8144.
+    ports:
+      - "192.0.2.10:8144:80"
+    networks:
+      karten-net:
+        ipv4_address: 172.23.144.2
+    healthcheck:
+      # 127.0.0.1 statt localhost: busybox-wget im nginx-alpine loest localhost
+      # zuerst nach IPv6 (::1) auf, nginx lauscht aber nur IPv4 -> Connection refused.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.5"
+    labels:
+      homelab.service: "karten"
+      homelab.category: "offline-wissen"
+
+  # Adresssuche mit Hausnummern. Schlaegt nur in einer SQLite-Datei nach und
+  # gibt JSON zurueck — reine Standardbibliothek, keine Fremdpakete (siehe
+  # adressen/dienst.py). Kein Port nach aussen: erreichbar ist er allein ueber
+  # /adressen/ im nginx nebenan.
+  adresssuche:
+    image: python:3.13-alpine
+    container_name: karten-adresssuche
+    restart: unless-stopped
+    command: ["python3", "/code/dienst.py"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    user: "1000:1000"
+    tmpfs:
+      - /tmp
+    volumes:
+      # ★ Verzeichnisse einhaengen, nicht einzelne Dateien: bei einer
+      #   Einzeldatei wechselt ein Editor den Inode und der Container sieht
+      #   danach ewig die alte Fassung.
+      - ./adressen:/code:ro
+      - /home/user/knowledge-vault/adressen:/daten:ro
+    environment:
+      INDEX: /daten/adressen.sqlite
+      PORT: "8148"
+    networks:
+      karten-net:
+        ipv4_address: 172.23.144.10
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8148/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+    labels:
+      homelab.service: "karten-adresssuche"
+      homelab.category: "offline-wissen"
+
+# ★ Festes Subnetz statt Selbstvergabe (Hausregel): eine automatisch vergebene
+#   Spanne kann das Speedport-LAN ueberdecken — genau dieser Vorfall am
+#   2026-06-16. Die 172.23.14x-Reihe ist die des Offline-Wissens:
+#   kiwix .140, calibre .141, knowledge-api .142, navidrome .143, karten .144.
+networks:
+  karten-net:
+    name: karten-net
+    ipam:
+      config:
+        - subnet: 172.23.144.0/24
