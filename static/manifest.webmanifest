@@ -1,0 +1,26 @@
+{
+  "name": "Karten — Offline (Homelab)",
+  "short_name": "Karten",
+  "description": "Offline-Karte für Deutschland und die Niederlande mit Adresssuche und Routenplanung — ohne Internet.",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7f6f2",
+  "theme_color": "#f7f6f2",
+  "icons": [
+    {
+      "src": "/karte.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/karte.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

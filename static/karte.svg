@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Symbol fuer den Startbildschirm. Bewusst SVG statt PNG: kein Binaerobjekt im
+     Repo, und der Rand ist so grosszuegig, dass ein rundes Zuschneiden (maskable)
+     nichts Wichtiges abschneidet. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#3a6ea5"/>
+  <g transform="translate(96 96)">
+    <!-- Aufgeschlagene Karte: drei Bahnen im Zickzack -->
+    <path d="M0 48 L104 16 L216 48 L320 16 L320 272 L216 304 L104 272 L0 304 Z"
+          fill="#f7f6f2"/>
+    <path d="M104 16 L104 272 M216 48 L216 304" stroke="#c8c2b6" stroke-width="9"
+          fill="none" stroke-linecap="round"/>
+    <!-- Weg quer ueber die Karte -->
+    <path d="M40 250 C 110 200, 130 120, 210 96 C 250 84, 280 70, 300 48"
+          stroke="#3a8ed0" stroke-width="16" fill="none"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Zielpunkt -->
+    <circle cx="300" cy="48" r="26" fill="#a3402f"/>
+    <circle cx="300" cy="48" r="10" fill="#f7f6f2"/>
+  </g>
+</svg>
