@@ -3,7 +3,7 @@
 # fuer MapLibre (3D-Gelaende + Schummerung).
 #
 # Ergebnis: gelaende.mbtiles, Terrarium-kodiert, z8 bis z16 (2,4 m je Bildpunkt).
-# Die Quelle hat 1 m Raster — z16 ist also noch ehrlich aufgeloest und nicht
+# Die Quelle hat 1 m Raster: z16 ist also noch ehrlich aufgeloest und nicht
 # hochgerechnet. Fuer die Silhouette von Haengen waere z14 genug, aber der Platz
 # ist da und die Hoehenabfrage am Cursor profitiert.
 #
@@ -13,7 +13,7 @@
 #
 # ★★ `-r average` beim Warpen und bei den Uebersichtsstufen, NICHT `bilinear`:
 #    beim Verkleinern eines Hoehenmodells soll jeder Quellwert eingehen. Bilinear
-#    tastet nur vier Nachbarn ab und laesst bei Faktor 8 den Rest liegen —
+#    tastet nur vier Nachbarn ab und laesst bei Faktor 8 den Rest liegen:
 #    einzelne Felsnasen und Bachtaeler verschwinden dann je nach Zoomstufe.
 set -euo pipefail
 
@@ -35,13 +35,13 @@ anzahl=$(ls -1 "$QUELLE"/*.tif 2>/dev/null | wc -l)
 echo "== Terrain aus $anzahl DGM1-Kacheln, z$MINZOOM..z$MAXZOOM ($TR m/px) =="
 
 # --- Stufe 1: virtuelles Mosaik ----------------------------------------------
-# DGM1 ist bereits unkomprimiertes GeoTIFF — kein Auspackschritt noetig, anders
+# DGM1 ist bereits unkomprimiertes GeoTIFF, kein Auspackschritt noetig, anders
 # als bei den JPEG2000-Luftbildern.
 ls -1 "$QUELLE"/*.tif | sed "s|$WURZEL/|/w/|" > "$WURZEL/dgm.txt"
 gdal gdalbuildvrt -overwrite -input_file_list /w/dgm.txt /w/dgm.vrt
 
 # --- Stufe 2: nach WebMercator warpen ----------------------------------------
-# Float32 bleibt Float32 — hier wird noch nichts kodiert.
+# Float32 bleibt Float32, hier wird noch nichts kodiert.
 echo "-> warpen nach EPSG:3857"
 gdal gdalwarp -overwrite -t_srs EPSG:3857 -tr "$TR" "$TR" -r average \
     -multi -wo NUM_THREADS=ALL_CPUS --config GDAL_CACHEMAX 1536 \

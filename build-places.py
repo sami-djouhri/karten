@@ -2,7 +2,7 @@
 """Offline-Ortsindex fuer den karten-Dienst (GeoNames, CC-BY).
 
 ★ Warum Alternativnamen noetig sind: GeoNames fuehrt Orte unter ihrem
-internationalen Namen — die Stadt Muenchen heisst dort "Munich", Kopenhagen
+internationalen Namen, die Stadt Muenchen heisst dort "Munich", Kopenhagen
 "Copenhagen". Eine Suche nur ueber die name-Spalte findet auf Deutsch nichts
 (getestet 2026-08-16: "München" lieferte nur Münchenstein/Münchenbuchsee).
 Deshalb: deutschen Namen aus alternateNamesV2 ziehen, als ANZEIGENAME nehmen und

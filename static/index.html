@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <title>Karten — Offline (Homelab)</title>
+  <title>Karten: Offline (Homelab)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#f7f6f2" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -46,7 +46,7 @@
     #suche input:focus { outline: 2px solid #3a6ea5; }
     #suche input { padding-right: 38px; }
     /* ★ Sichtbarer Zugang zur Merkliste. Sie erschien bisher NUR, wenn man ins
-       leere Suchfeld tippte — funktionsfähig, aber unauffindbar: ein gemerkter
+       leere Suchfeld tippte: funktionsfähig, aber unauffindbar: ein gemerkter
        Ort war danach praktisch verschwunden. Ein Merkzettel, den man nicht
        wiederfindet, ist keiner. */
     #merkbtn { position: absolute; right: 6px; top: 6px; width: 28px; height: 28px;
@@ -60,7 +60,7 @@
     #treffer div:last-child { border-bottom: 0; }
     #treffer div:hover, #treffer div.aktiv { background: #eaf1f8; }
     #treffer .meta { color: #777; font-size: 12px; margin-left: 6px; }
-    /* Hinweis nur im unsicheren Kontext — bewusst gelb statt rot: es ist kein
+    /* Hinweis nur im unsicheren Kontext: bewusst gelb statt rot: es ist kein
        Fehler, die Karte funktioniert vollstaendig, nur GPS bleibt gesperrt. */
     #unsicher { position: absolute; bottom: 8px; right: 8px; z-index: 6;
       max-width: min(340px, calc(100vw - 16px)); display: none;
@@ -100,7 +100,7 @@
     #rgo { width: 100%; border: 0; border-radius: 4px; background: #3a6ea5; color: #fff;
       padding: 9px 0; font-size: 14px; font-family: inherit; cursor: pointer; }
     #rgo:disabled { background: #b6c4d3; cursor: default; }
-    /* Erscheint erst, wenn eine Route auf der Karte liegt — ein dauerhaft
+    /* Erscheint erst, wenn eine Route auf der Karte liegt, ein dauerhaft
        sichtbarer Entfernen-Knopf ohne etwas zu entfernen verwirrt mehr, als er
        hilft. */
     #rweg { display: none; width: 100%; margin-top: 5px; border: 1px solid #d8d4cc;
@@ -119,7 +119,7 @@
     #rerg .steig { font-size: 12px; color: #666; margin-bottom: 5px;
       font-variant-numeric: tabular-nums; }
     #rerg .steig b { font-weight: 600; color: #444; }
-    /* Start und Ziel vertauschen — der Rueckweg ist der haeufigste zweite Weg. */
+    /* Start und Ziel vertauschen, der Rueckweg ist der haeufigste zweite Weg. */
     #rtausch { display: block; margin: -2px 0 6px 26px; border: 0; background: transparent;
       font-size: 12.5px; color: #3a6ea5; cursor: pointer; font-family: inherit; padding: 0; }
 
@@ -179,7 +179,7 @@
     #navileiste button:hover { background: #405060; }
     #navileiste .warn { color: #ffd27f; }
     /* Nachtmodus faerbt die Kartenebenen um (setPaintProperty), nicht die
-       Bedienung — die ist ohnehin schon dunkel. */
+       Bedienung, die ist ohnehin schon dunkel. */
     #rnavi { display: none; width: 100%; margin-top: 5px; border: 0; border-radius: 4px;
       background: #2e7d4f; color: #fff; padding: 9px; font-size: 14px; font-weight: 600;
       font-family: inherit; cursor: pointer; }
@@ -192,11 +192,11 @@
   <div id="suche"><input type="search" id="q" placeholder="Ort suchen …" autocomplete="off" enterkeyhint="search" /><button id="merkbtn" title="Gemerkte Orte" aria-label="Gemerkte Orte">★</button><div id="treffer"></div></div>
   <div id="ebenen"><div id="regionsel"></div><div id="bildsel"></div><div id="reliefsel"></div><div id="poisel"></div></div>
   <a id="groesser" href="/" target="_blank" rel="noopener">Karte öffnen</a>
-  <div id="hud">—</div>
+  <div id="hud">–</div>
   <button id="routebtn" title="Route planen" aria-label="Route planen">⇄</button>
   <div id="routebox">
     <div class="rz"><span class="pin a">A</span>
-      <input id="rstart" type="search" placeholder="Start — Ort oder Straße" autocomplete="off" />
+      <input id="rstart" type="search" placeholder="Start: Ort oder Straße" autocomplete="off" />
       <button class="hier" data-ziel="rstart" title="Kartenmitte übernehmen">Mitte</button></div>
     <button id="rtausch" title="Start und Ziel vertauschen">⇅ Start und Ziel tauschen</button>
     <div class="rz"><span class="pin b">B</span>
@@ -217,14 +217,14 @@
     <div class="jetzt">
       <div class="pfeil" id="navipfeil">↑</div>
       <div class="text">
-        <div class="entfernung" id="navientfernung">—</div>
+        <div class="entfernung" id="navientfernung">–</div>
         <div class="anweisung" id="navianweisung">Warte auf Standort …</div>
       </div>
     </div>
     <div class="danach" id="navidanach"></div>
   </div>
   <div id="navileiste">
-    <span class="rest" id="navirest">—</span>
+    <span class="rest" id="navirest">–</span>
     <span id="navizustand"></span>
     <button id="navinacht">Nacht</button>
     <button id="naviende">Beenden</button>
@@ -239,11 +239,11 @@
 
     // GPS-Knopf ohne sicheren Kontext: Browser geben navigator.geolocation nur
     // ueber HTTPS (oder localhost) frei. Der Knopf ist dann sichtbar, tut aber
-    // nichts — das sah lange nach einem Defekt aus. Deshalb dieser Hinweis:
+    // nichts, das sah lange nach einem Defekt aus. Deshalb dieser Hinweis:
     // er erscheint NUR, wenn die Seite unsicher geladen wurde.
     // ★ Drei sehr verschiedene Ursachen sehen im Browser voellig gleich aus:
     //   der GPS-Knopf tut nichts und es kommt keine Nachfrage. Unverschluesselt
-    //   geladen, Schnittstelle fehlt, oder dauerhaft blockiert — von aussen
+    //   geladen, Schnittstelle fehlt, oder dauerhaft blockiert, von aussen
     //   nicht zu unterscheiden. Deshalb sagt die Seite selbst, welche es ist,
     //   samt der Adresse, unter der sie gerade laeuft.
     function zeigen(html) {
@@ -257,7 +257,7 @@
     (function standortLage() {
       if (!window.isSecureContext) {
         zeigen('<b>Standort gesperrt: unverschl&uuml;sselt geladen.</b> Diese Seite l&auml;uft ' +
-               'gerade als <code>' + location.protocol + '//' + location.host + '</code> — ' +
+               'gerade als <code>' + location.protocol + '//' + location.host + '</code>: ' +
                'der GPS-Knopf braucht HTTPS. Stattdessen ' +
                '<a href="https://karten.home.arpa/">karten.home.arpa</a> &ouml;ffnen. ' +
                'Warnt der Browser dort, fehlt einmalig die Homelab-CA: ' +
@@ -269,7 +269,7 @@
         zeigen('<b>Standort gesperrt: der Browser bietet die Schnittstelle nicht an.</b> ' +
                'Die Seite l&auml;uft verschl&uuml;sselt (<code>' + location.host + '</code>), ' +
                'trotzdem fehlt <code>navigator.geolocation</code>. Bei Firefox f&uuml;r Android ' +
-               'ist das meist der eigene Zertifikatsspeicher — zum Gegentest dieselbe ' +
+               'ist das meist der eigene Zertifikatsspeicher, zum Gegentest dieselbe ' +
                'Adresse in Chrome &ouml;ffnen.');
         return;
       }
@@ -312,7 +312,7 @@
     // ★ Die Weltebene liegt UNTER der Detailkarte und wird nur dort sichtbar, wo
     //   der Regionsausschnitt aufhoert. Ohne sie endet die Karte an der bbox-Kante
     //   (gemessen: bei z8 fehlen Paris, London, Warschau, Oslo, Mailand) und
-    //   ringsum bleibt eine leere Flaeche stehen — neben der blauen Nordsee liest
+    //   ringsum bleibt eine leere Flaeche stehen: neben der blauen Nordsee liest
     //   sich das als Wasser. Sie darf fehlen: dann werden Quelle und Ebenen aus
     //   dem Stil geworfen, und die Karte verhaelt sich wie vorher.
     //   ★★ Ihre Flaechenebenen enden in style.json bei z9 (maxzoom). welt.pmtiles
@@ -345,7 +345,7 @@
         center: [10.2, 51.2],   // Mitte Deutschland
         zoom: 5.4,
         // ★ 20, nicht 18: seit 2026-08-25 zeigt die Karte auch OHNE Luftbild
-        //   etwas in dieser Tiefe — Hausnummern ab z18 und Gebaeude in 3D.
+        //   etwas in dieser Tiefe: Hausnummern ab z18 und Gebaeude in 3D.
         //   Vorher war bei 18 Schluss, und der Unterschied zwischen 18 und 20
         //   blieb der Bildebene vorbehalten.
         maxZoom: 20,
@@ -354,7 +354,7 @@
 
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
       map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }));
-      // GPS des Geräts funktioniert AUCH offline — echte Standortbestimmung ohne Internet.
+      // GPS des Geräts funktioniert AUCH offline: echte Standortbestimmung ohne Internet.
       // ★ timeout gesetzt: ohne ihn wartet die Abfrage unbegrenzt. Drinnen, ohne
       //   Satellitenempfang, sieht das aus wie ein toter Knopf.
       const gpsKnopf = new maplibregl.GeolocateControl({
@@ -372,7 +372,7 @@
         const erklaerung = {
           1: '<b>Standort abgelehnt (Code 1).</b> Nicht das Ger&auml;t verweigert, sondern ' +
              'der Browser f&uuml;r DIESE Seite. Im Schloss-Symbol links in der Adresszeile ' +
-             'die Berechtigung „Standort" zur&uuml;cksetzen — die App-Berechtigung von ' +
+             'die Berechtigung „Standort" zur&uuml;cksetzen, die App-Berechtigung von ' +
              'Firefox reicht daf&uuml;r nicht. Bei Firefox f&uuml;r Android hilft sonst der ' +
              'Gegentest in Chrome.',
           2: '<b>Standort nicht ermittelbar (Code 2).</b> Der Browser durfte fragen, das ' +
@@ -386,14 +386,14 @@
                ' <br><small>Seite l&auml;uft als <code>' + location.protocol + '//' +
                location.host + '</code>, sicherer Kontext: ' +
                (window.isSecureContext ? 'ja' : 'NEIN') + '. Nach dem Beheben die Seite ' +
-               'neu laden — der Knopf bleibt sonst abgeschaltet.</small>');
+               'neu laden, der Knopf bleibt sonst abgeschaltet.</small>');
       });
 
       const hud = document.getElementById('hud');
       // ★ Gefragt wird `map.getTerrain()`, nicht der Schaltzustand des Knopfes:
       //   der Knopf steht weiter unten im Skript, und eine Mausbewegung vor
       //   seiner Deklaration liefe in die temporale Totzone. Der Kartenzustand
-      //   ist ohnehin die ehrlichere Quelle — er sagt, ob wirklich Hoehen da sind.
+      //   ist ohnehin die ehrlichere Quelle, er sagt, ob wirklich Hoehen da sind.
       function hoeheText(lngLat) {
         const gelaende = map.getTerrain();
         if (!gelaende) return '';
@@ -423,7 +423,7 @@
         return `  ·  ${Math.round(echt)} m`;
       }
       // ★ Ausserhalb des Detailausschnitts endet die Karte ab z9 bei Ortsnamen
-      //   auf leerer Flaeche — die Weltebene reicht nur bis z7, und ihre
+      //   auf leerer Flaeche, die Weltebene reicht nur bis z7, und ihre
       //   Flaechen 32-fach vergroessert waeren keine Auskunft, sondern eine
       //   falsche. Eine leere Flaeche liest sich aber wie ein Defekt, deshalb
       //   steht der Grund dabei. Die Grenze kommt aus der geladenen Quelle
@@ -460,14 +460,14 @@
       //    Verschieben die Zeile ohnehin neu fuellt.
       map.on('error', e => {
         if (e && e.error && /pmtiles|maps\//.test(String(e.error.message || e.error))) {
-          warn('Kartendaten (' + aktuell.datei + ') fehlen oder werden noch erstellt — extract-maps.sh läuft?');
+          warn('Kartendaten (' + aktuell.datei + ') fehlen oder werden noch erstellt: extract-maps.sh läuft?');
         }
       });
 
 
       // ---- Ortssuche (offline) ---------------------------------------------
       // Der Index (/maps/places.json, GeoNames) wird erst beim ersten Tippen
-      // geladen — die Karte startet dadurch unveraendert schnell.
+      // geladen, die Karte startet dadurch unveraendert schnell.
       const eingabe = document.getElementById('q');
       const trefferBox = document.getElementById('treffer');
       let orte = null, ladelauf = null, markierung = null, auswahl = -1;
@@ -521,7 +521,7 @@
       // geladenen Kartenkacheln (Ebene "roads" fuehrt name/name:de mit). Deshalb
       // nur im sichtbaren Ausschnitt und erst ab Zoom 13, wo Strassen in den
       // Kacheln stecken. Ein landesweiter Strassenindex waere ein eigener Dienst:
-      // Deutschland+NL haben ueber eine Million Strassennamen — zu viel fuer den
+      // Deutschland+NL haben ueber eine Million Strassennamen, zu viel fuer den
       // Browser, das braeuchte eine serverseitige Suche.
       const STRASSEN_ZOOM = 13;
 
@@ -564,7 +564,7 @@
           trefferBox.appendChild(z);
         };
         // Adressstrassen zuerst: wer eine Strasse tippt, meint fast immer eine
-        // Hausnummer darin — und nur dieser Weg fuehrt dorthin.
+        // Hausnummer darin, und nur dieser Weg fuehrt dorthin.
         (adressStrassen || []).slice(0, 6).forEach(st =>
           zeile(st.name, st.ort + ' · ' + st.anzahl + ' Hausnummern',
                 () => waehleStrasse(st)));
@@ -588,7 +588,7 @@
         trefferBox.style.display = 'none';
         eingabe.value = o.n;
         eingabe.blur();
-        // Bei Strassen nicht herauszoomen — der Ausschnitt ist ja schon nah dran.
+        // Bei Strassen nicht herauszoomen, der Ausschnitt ist ja schon nah dran.
         map.flyTo({ center: [o.lon, o.lat],
                     zoom: o.strasse ? Math.max(map.getZoom(), 16) : Math.max(map.getZoom(), 12),
                     speed: 1.4 });
@@ -610,7 +610,7 @@
       let adressPräfix = '';       // was wir selbst ins Feld geschrieben haben
 
       // Faellt der Dienst aus (oder wird der Index gerade gebaut), liefert die
-      // Suche einfach keine Adressen — die Karte darf daran nicht haengen.
+      // Suche einfach keine Adressen, die Karte darf daran nicht haengen.
       const adressAbruf = (pfad) =>
         fetch('/adressen/' + pfad).then(r => r.ok ? r.json() : []).catch(() => []);
 
@@ -651,7 +651,7 @@
         adressPräfix = st.name + ', ' + st.ort + ' ';
         eingabe.value = adressPräfix;
         eingabe.focus();
-        // Gleich die ersten Hausnummern zeigen — sonst wirkt das Feld tot.
+        // Gleich die ersten Hausnummern zeigen, sonst wirkt das Feld tot.
         adressAbruf('nummern?strasse=' + st.id).then(zeigeHausnummern);
       }
 
@@ -661,7 +661,7 @@
         tippTimer = setTimeout(() => {
           // Leeres Feld heisst nicht „nichts anzuzeigen": dann stehen dort die
           // gemerkten Orte. Ohne das waere die Merkliste nur ueber Umwege zu
-          // erreichen — und ein Notfallwerkzeug muss man blind treffen koennen.
+          // erreichen, und ein Notfallwerkzeug muss man blind treffen koennen.
           if (!eingabe.value.trim() && !adressModus) { zeigeMerkliste(); return; }
           // Im Adressmodus: alles hinter „Strasse, Ort " ist die Hausnummer.
           // Loescht jemand den Praefix weg, ist er wieder in der freien Suche.
@@ -705,7 +705,7 @@
       // ---- Routenplanung (offline, Valhalla auf LXC 102) ---------------------
       // Der Dienst liegt auf 192.0.2.10:8002 und ist per Firewall nur fuer
       // host/node1 erreichbar. Das Frontend spricht ihn deshalb NICHT direkt an,
-      // sondern ueber /route/ — nginx auf node1 proxyt dorthin. Vorteil: gleiche
+      // sondern ueber /route/: nginx auf node1 proxyt dorthin. Vorteil: gleiche
       // Herkunft, also kein CORS, und der Browser braucht keinen eigenen Zugang.
       const ROUTE_API = '/route/';
 
@@ -735,7 +735,7 @@
           document.querySelectorAll('#rmodi button').forEach(x => x.classList.toggle('on', x === b));
           // ★ Liegt schon eine Route auf der Karte, wird sie sofort neu
           //   gerechnet. Vorher musste man nach dem Umschalten von Auto auf Rad
-          //   von Hand nachtreten — und sah bis dahin die AUTO-Route, waehrend
+          //   von Hand nachtreten, und sah bis dahin die AUTO-Route, waehrend
           //   der Knopf „Rad" hervorgehoben war. Das ist keine fehlende
           //   Bequemlichkeit, sondern eine falsche Anzeige.
           if (map.getSource('route') && punkte.rstart && punkte.rziel) {
@@ -758,13 +758,13 @@
         };
       });
 
-      // Beide Eingabefelder teilen sich EINE Trefferliste — zwei getrennte waeren
+      // Beide Eingabefelder teilen sich EINE Trefferliste: zwei getrennte waeren
       // auf dem Handy zu eng.
       //
       // ★★ Genau daraus wurde ein boesartiger Fehler: frueher las der Klick das
       //    gerade fokussierte Feld aus. Wer den Start eintippte, dann ins
       //    Ziel-Feld wechselte und aus der noch sichtbaren Liste auswaehlte,
-      //    bekam die Koordinaten des STARTS ins Ziel geschrieben — sichtbar erst
+      //    bekam die Koordinaten des STARTS ins Ziel geschrieben: sichtbar erst
       //    an einer absurden Fahrzeit. Deshalb jetzt zweifach abgesichert: die
       //    Liste gehoert fest zu dem Feld, fuer das sie gebaut wurde (`feld`),
       //    und beim Feldwechsel verschwindet sie.
@@ -820,7 +820,7 @@
           text.trim().length >= 2
             ? adressAbruf('strassen?q=' + encodeURIComponent(text)) : [],
         ]).then(([, strassen]) => {
-          // Adressen zuerst — ein Fahrziel ist fast immer eine Hausnummer,
+          // Adressen zuerst, ein Fahrziel ist fast immer eine Hausnummer,
           // nicht ein Ortsmittelpunkt.
           const adressen = strassen.slice(0, 6).map(st => ({
             n: st.name, l: st.ort + ' · ' + st.anzahl + ' Hausnummern', adresse: st,
@@ -837,7 +837,7 @@
           const z = document.createElement('div');
           z.textContent = o.n + (o.l ? ' · ' + o.l : (o.strasse ? ' · Straße im Ausschnitt' : ''));
           z.onclick = () => {
-            // Eine Strasse ohne Nummer ist noch kein Ziel — eine Stufe weiter.
+            // Eine Strasse ohne Nummer ist noch kein Ziel, eine Stufe weiter.
             if (o.adresse) {
               rAdresse = { feld, strasse: o.adresse,
                            präfix: o.adresse.name + ', ' + o.adresse.ort + ' ' };
@@ -859,7 +859,7 @@
       }
 
       // Valhalla liefert die Geometrie als Polyline mit SECHS Nachkommastellen.
-      // Der verbreitete Google-Decoder rechnet mit fuenf — damit landet die Route
+      // Der verbreitete Google-Decoder rechnet mit fuenf, damit landet die Route
       // um den Faktor zehn verschoben irgendwo im Nichts.
       function decodePolyline6(str) {
         const koord = [];
@@ -916,7 +916,7 @@
 
       // Nimmt die Route samt Markierungen von der Karte. Bis 2026-08-25 gab es
       // dafuer gar keinen Weg: eine einmal gezeichnete Linie blieb liegen, bis
-      // man eine andere berechnete — auch wenn man laengst woanders hinsah.
+      // man eine andere berechnete, auch wenn man laengst woanders hinsah.
       function routeLoeschen() {
         ['route-linie', 'route-rand'].forEach(id => {
           if (map.getLayer(id)) map.removeLayer(id);
@@ -936,7 +936,7 @@
 
       function routeBerechnen() {
         if (!punkte.rstart || !punkte.rziel) {
-          rErg.innerHTML = '<span class="weg">Start und Ziel wählen — tippen, oder „Mitte“ benutzen.</span>';
+          rErg.innerHTML = '<span class="weg">Start und Ziel wählen: tippen, oder „Mitte“ benutzen.</span>';
           return;
         }
         rGo.disabled = true;
@@ -949,18 +949,18 @@
             costing,
             units: 'kilometers',
             directions_options: { language: 'de-DE' },
-            // ★ Der Wert ist in METERN — und zwar unabhängig von `units` oben.
+            // ★ Der Wert ist in METERN, und zwar unabhängig von `units` oben.
             //   Mit 0.1 liefert Valhalla brav alle 10 Zentimeter einen Wert:
             //   für Heiligenhaus–Solingen 231.943 Höhenpunkte und rund ein
             //   Megabyte Antwort für ein Profil von 260 Bildpunkten Breite.
             //   50 m ergeben dieselbe Kurve bei einem Hundertstel der Daten.
             //   Liefert Valhalla noch keine Höhen, fehlt das Feld in der
-            //   Antwort einfach und die Auswertung blendet das Profil aus —
+            //   Antwort einfach und die Auswertung blendet das Profil aus:
             //   deshalb darf das Feld dauerhaft in der Anfrage stehen.
             elevation_interval: 50,
           }),
         })
-          // Waehrend der Kachelbau laeuft, antwortet nginx mit 502 und HTML —
+          // Waehrend der Kachelbau laeuft, antwortet nginx mit 502 und HTML:
           // ein blindes r.json() wuerde dann einen Parser-Fehler anzeigen statt
           // zu sagen, was wirklich los ist.
           .then(async r => {
@@ -970,7 +970,7 @@
             if (r.ok && j) return j;
             if (j) return Promise.reject(j);
             return Promise.reject({ error: r.status === 502 || r.status === 504
-              ? 'Routing-Dienst antwortet nicht — baut er noch die Kacheln?'
+              ? 'Routing-Dienst antwortet nicht: baut er noch die Kacheln?'
               : `Routing-Dienst meldet HTTP ${r.status}` });
           })
           .then(d => {
@@ -987,7 +987,7 @@
                 (m.length > 0.02 ? ` <span class="weg">(${meter(m.length)})</span>` : '') +
                 '</li>').join('') + '</ol>';
             rWeg.style.display = 'block';
-            // Die Antwort aufheben statt sie nach dem Zeichnen wegzuwerfen —
+            // Die Antwort aufheben statt sie nach dem Zeichnen wegzuwerfen:
             // sie ist die ganze Grundlage des Folgemodus.
             letzteFahrt = d.trip;
             naviEl.start.style.display = schritte.length ? 'block' : 'none';
@@ -1012,7 +1012,7 @@
       // ================= Navigation (Folgemodus) =============================
       // Bis hierher war die Route eine Zeichnung mit einer Liste darunter: die
       // Antwort von Valhalla wurde nach dem Zeichnen weggeworfen. Sie enthaelt
-      // aber alles, was ein Navi braucht — die Manoever tragen
+      // aber alles, was ein Navi braucht, die Manoever tragen
       // begin_shape_index/end_shape_index, die exakt in die aus
       // decodePolyline6() gewonnene Punktfolge zeigen, und drei fertige
       // deutsche Ansagetexte je Manoever (Vorwarnung, jetzt, danach). Es muss
@@ -1051,7 +1051,7 @@
           // ★ Die Indizes sind je Bein gezaehlt. Beim Aneinanderhaengen mehrerer
           //   Beine muss der Versatz drauf, sonst zeigen alle Manoever des
           //   zweiten Beins an den Anfang der Route. Bei zwei Punkten gibt es
-          //   nur ein Bein — der Fehler faellt dann nie auf und schlaegt erst
+          //   nur ein Bein, der Fehler faellt dann nie auf und schlaegt erst
           //   zu, wenn jemand einen Zwischenhalt einbaut.
           (l.maneuvers || []).forEach(m => manoever.push(Object.assign({}, m, {
             von: versatz + m.begin_shape_index,
@@ -1068,7 +1068,7 @@
       }
 
       // Fusspunkt der Position auf der Strecke. Die Suche laeuft ueber ein
-      // Fenster um den zuletzt bekannten Index — ohne das springt die Position
+      // Fenster um den zuletzt bekannten Index, ohne das springt die Position
       // an gekreuzten Stellen (Kreisverkehr, Autobahnkreuz, Hin- und Rueckweg
       // auf derselben Strasse) auf den falschen Abschnitt, und die Anzeige
       // wechselt scheinbar grundlos das Manoever.
@@ -1093,7 +1093,7 @@
 
       // ---- Anzeige ----------------------------------------------------------
       // Valhallas Manoevertypen auf Pfeile. Unbekanntes wird zum geraden Pfeil,
-      // nicht zu einem falschen — ein erfundener Abbiegepfeil waere schlimmer
+      // nicht zu einem falschen, ein erfundener Abbiegepfeil waere schlimmer
       // als gar keiner.
       const NAVI_PFEIL = {
         1: '↑', 2: '↑', 3: '↑', 4: '⚑', 5: '⚑', 6: '⚑',
@@ -1117,7 +1117,7 @@
       // ⚠ Die eingebaute Stimme ist auf diesem Laptop wirkungslos: Firefox
       //   spricht unter Linux nur ueber speech-dispatcher, und das Paket ist
       //   nicht installiert. Auf einem Handy traegt sie vollstaendig. Deshalb
-      //   wird geprueft statt angenommen — und wenn keine Stimme da ist, sagt
+      //   wird geprueft statt angenommen, und wenn keine Stimme da ist, sagt
       //   die Leiste das, statt einfach zu schweigen.
       const TTS_API = '/tts/';
       const KLANG_CACHE = 'navi-ansagen-v1';
@@ -1186,7 +1186,7 @@
       }
 
       // Ansagen der Route im Voraus erzeugen, solange der TTS-Weg erreichbar
-      // ist — unterwegs ist er es nicht mehr. Erst die naechsten drei Manoever,
+      // ist: unterwegs ist er es nicht mehr. Erst die naechsten drei Manoever,
       // damit man sofort losfahren kann, den Rest im Hintergrund.
       async function ansagenVorproduzieren(r) {
         if (!('caches' in window)) return;
@@ -1221,7 +1221,7 @@
         if (navi.ansagenStand) {
           teile.push('Ansagen ' + navi.ansagenStand);
         } else if (navi.klangWeg === false) {
-          // Ehrlich benennen, welche Stimme gerade spricht — und wenn keine
+          // Ehrlich benennen, welche Stimme gerade spricht, und wenn keine
           // spricht, das auch sagen. Stille sieht sonst aus wie ein Defekt.
           teile.push(stimmeVorhanden() ? 'Stimme des Browsers' : '<span class="warn">ohne Sprachausgabe</span>');
         }
@@ -1231,7 +1231,7 @@
       // ---- Nachtmodus -------------------------------------------------------
       // Umgefaerbt wird der VORHANDENE Stil ueber setPaintProperty. Ein zweites
       // style.json waere die naheliegende Loesung und liefe bei jeder Aenderung
-      // auseinander — man pflegt dann zwei Karten und merkt es erst, wenn eine
+      // auseinander, man pflegt dann zwei Karten und merkt es erst, wenn eine
       // Ebene nachts fehlt.
       const NACHT = [
         ['background', 'background-color', '#12161b'],
@@ -1250,7 +1250,7 @@
         ['roads-label', 'text-color', '#9aa5b1'],
         ['roads-label', 'text-halo-color', '#12161b'],
         // Die Beschriftungen behalten sonst ihre Tagfarben und leuchten
-        // nachts als bunte Flecken heraus — im Bild sofort zu sehen, im Code
+        // nachts als bunte Flecken heraus, im Bild sofort zu sehen, im Code
         // nicht. Das rote POI-Rot war der auffaelligste.
         ['poi-label-wichtig', 'text-color', '#c98a7a'],
         ['poi-label-wichtig', 'text-halo-color', '#12161b'],
@@ -1323,7 +1323,7 @@
 
         // ★ Die Ausrichtung passiert bewusst NICHT hier, sondern in der ersten
         //   Standortmeldung. Ein easeTo hier wuerde von dem in naviKamera
-        //   sofort abgebrochen — und zwar mittendrin, sodass Neigung und Zoom
+        //   sofort abgebrochen, und zwar mittendrin, sodass Neigung und Zoom
         //   auf einem zufaelligen Zwischenwert stehen bleiben. Genau so sah das
         //   erste Bild aus: flache Karte, viel zu weit weg, und im Code stand
         //   scheinbar korrekt pitch 55 und zoom 16.5.
@@ -1357,7 +1357,7 @@
         const genauigkeit = Math.max(10, p.coords.accuracy || 25);
         const schwelle = Math.max(40, 3 * genauigkeit);
 
-        // Zu weit weg? Einmal ueber die ganze Route suchen — vielleicht sind
+        // Zu weit weg? Einmal ueber die ganze Route suchen: vielleicht sind
         // wir nur weitergesprungen (Tunnel, Standortverlust), nicht abgebogen.
         if (!f || f.abstand > schwelle) {
           const ganz = fusspunkt(r, pos, 0, r.koord.length - 1);
@@ -1369,7 +1369,7 @@
         if (f.abstand > schwelle) {
           navi.abweichungen++;
           // ★ Erst nach mehreren Messungen in Folge. Ein einzelner Ausreisser
-          //   — und die gibt es unter Bruecken und zwischen Haeusern staendig —
+          //   (und die gibt es unter Bruecken und zwischen Haeusern staendig)
           //   darf keine Neuberechnung ausloesen. Die Schwelle selbst haengt an
           //   der gemeldeten Genauigkeit statt fest zu sein: bei 5 m Genauigkeit
           //   sind 40 m viel, bei 60 m sind sie nichts.
@@ -1381,13 +1381,13 @@
         // Welches Manoever kommt? Das erste, dessen Beginn noch vor uns liegt.
         // ★★ Die 10 Meter Zugabe sind nicht Kosmetik. Mit `<= entlang` wurde ein
         //   Manoever, das GENAU an der aktuellen Position beginnt, sofort als
-        //   erledigt abgehakt — und genau das passiert am Routenanfang:
+        //   erledigt abgehakt, und genau das passiert am Routenanfang:
         //   Valhalla setzt dort oft zwei Manoever auf denselben Punkt ("Auf X
         //   Richtung Sueden fahren", dann "Rechts abbiegen um auf X zu
         //   bleiben"). Die Abbiegung wurde dadurch nie angezeigt. Gemessen an
         //   einer 7,3-km-Fahrt mit 293 Messungen: 1 von 9 Manoevern fehlte,
         //   ausgerechnet das erste echte. Die Zugabe deckt zugleich das
-        //   Zittern des Standorts ab — ohne sie kann ein Ausreisser nach vorn
+        //   Zittern des Standorts ab, ohne sie kann ein Ausreisser nach vorn
         //   ein Manoever ueberspringen, und zurueck geht der Zaehler nie.
         let mi = navi.mIdx;
         while (mi + 1 < r.manoever.length && r.kum[r.manoever[mi + 1].von] + 10 < f.entlang) mi++;
@@ -1455,7 +1455,7 @@
         if (peilung === null) {
           // ★ Im Stand liefert das Geraet keine Peilung. Auf 0 zu springen
           //   drehte die Karte an jeder roten Ampel nach Norden. Stattdessen
-          //   die Richtung der Strecke am Fusspunkt nehmen — die stimmt auch
+          //   die Richtung der Strecke am Fusspunkt nehmen, die stimmt auch
           //   im Stand und ist genau die, in die man gleich weiterfaehrt.
           const a = r.koord[f.i], b = r.koord[Math.min(f.i + 1, r.koord.length - 1)];
           const dx = r.m.x(b) - r.m.x(a), dy = r.m.y(b) - r.m.y(a);
@@ -1469,11 +1469,11 @@
         if (navi.ersteAusrichtung) {
           // ★★ Die Erstausrichtung SPRINGT, sie gleitet nicht. Ein easeTo wird
           //   von der naechsten Standortmeldung abgebrochen, und zwar mitten in
-          //   der Bewegung — kommen die Meldungen im Sekundentakt und dauert
+          //   der Bewegung: kommen die Meldungen im Sekundentakt und dauert
           //   die Bewegung 900 ms, bleibt die Neigung bei rund der Haelfte
           //   stehen und wird nie wieder gesetzt. Gemessen: bei 1100 ms
           //   Messabstand Neigung 55, bei 500 ms rund 30. Der Fehler haengt
-          //   damit an der Taktung des Geraets — er tritt bei jedem zweiten
+          //   damit an der Taktung des Geraets, er tritt bei jedem zweiten
           //   Handy auf und bei keinem Test, der langsam genug misst.
           //   Danach gehoeren Neigung und Zoom dem Fahrer.
           map.jumpTo({ center: pos, bearing: peilung, pitch: 55, zoom: 16.5 });
@@ -1484,7 +1484,7 @@
       }
 
       // Eigene Position als gerichtete Marke. Ohne sie sieht man zwar die
-      // Route, aber nicht, wo auf ihr man steht — und beim ersten Blick aufs
+      // Route, aber nicht, wo auf ihr man steht, und beim ersten Blick aufs
       // Bild fehlt genau das.
       function eigenePositionZeigen(pos, peilung) {
         if (!navi.marke) {
@@ -1518,11 +1518,11 @@
           navi.gesagt = {}; navi.abweichungen = 0;
           ansagenVorproduzieren(r2);
         }).catch(() => {
-          // ★ Ohne Verbindung zum Routing-Dienst geht das nicht — und genau das
+          // ★ Ohne Verbindung zum Routing-Dienst geht das nicht, und genau das
           //   ist unterwegs der Normalfall, solange das Navi-Kit nicht auf dem
           //   Geraet laeuft. Dann lieber ehrlich sagen als still weiterzeigen,
           //   was auf der alten Route gerade dran waere.
-          naviEl.anweisung.textContent = 'Abseits der Route — Neuberechnung nicht möglich';
+          naviEl.anweisung.textContent = 'Abseits der Route: Neuberechnung nicht möglich';
         }).finally(() => { navi.neuberechnung = false; });
       }
 
@@ -1530,10 +1530,10 @@
       naviEl.ende.onclick = naviBeenden;
       naviEl.nacht.onclick = () => nachtSchalten(!nachtAn);
 
-      // Schreibgeschuetzter Blick auf den Kartenzustand — fuer tests/navifahrt.mjs
+      // Schreibgeschuetzter Blick auf den Kartenzustand, fuer tests/navifahrt.mjs
       // und fuer die Fehlersuche in der Browserkonsole. Bewusst NUR lesend: die
       // Pruefung soll die Bedienung benutzen, nicht an ihr vorbei. Ohne das
-      // laesst sich nicht belegen, ob Neigung und Drehung wirklich anliegen —
+      // laesst sich nicht belegen, ob Neigung und Drehung wirklich anliegen,
       // und genau daran ist die erste Fassung gescheitert, weil sie im Code
       // richtig aussah.
       window.kartenZustand = () => ({
@@ -1548,7 +1548,7 @@
       // Die Punktfolge der aktuell gezeichneten Route. Die simulierte Fahrt
       // braucht sie, um GENAU die Strecke abzufahren, die diese Seite berechnet
       // hat. Fuhr sie ihre eigene, lagen beide Starts rund 30 Meter auseinander
-      // — und ein Manoever 11 Meter hinter dem Start galt dadurch als
+      //, und ein Manoever 11 Meter hinter dem Start galt dadurch als
       // uebersprungen, obwohl es korrekt angezeigt worden waere.
       window.kartenRoute = () => letzteKoordinaten;
 
@@ -1568,7 +1568,7 @@
       // ---- Höhenprofil zur Route --------------------------------------------
       // Valhalla liefert `elevation` je Bein, sobald die Routing-Kacheln MIT
       // Höhendaten gebaut sind. Fehlt das Feld, gibt diese Funktion einen leeren
-      // String zurück und die Routenausgabe sieht aus wie vorher — deshalb darf
+      // String zurück und die Routenausgabe sieht aus wie vorher, deshalb darf
       // `elevation_interval` dauerhaft in der Anfrage stehen.
       function hoehenAbschnitt(beine) {
         const roh = beine.flatMap(l => Array.isArray(l.elevation) ? l.elevation : []);
@@ -1577,7 +1577,7 @@
 
         // ★ Ohne Höhendaten antwortet Valhalla nicht mit gar nichts, sondern mit
         //   lauter Nullen. Ein flaches Nullprofil ist keine fehlende Angabe,
-        //   sondern eine falsche — im Bergischen erst recht. Also lieber nichts
+        //   sondern eine falsche, im Bergischen erst recht. Also lieber nichts
         //   zeigen als eine Ebene behaupten.
         let min = hoehen.reduce((a, b) => Math.min(a, b), Infinity);
         let max = hoehen.reduce((a, b) => Math.max(a, b), -Infinity);
@@ -1587,7 +1587,7 @@
         //    Zehntelmeter, und die Summe dieser Zappelei ergäbe dreistellige
         //    Höhenmeter auf ebener Strecke. Gleitendes Mittel über fünf Punkte,
         //    bei 50-m-Abtastung also über 250 m Strecke.
-        //    Die ausgewiesene Steigung hängt damit von der Glättung ab — das
+        //    Die ausgewiesene Steigung hängt damit von der Glättung ab, das
         //    ist bei jeder Fahrrad-App so, nur sagt es keine dazu.
         const glatt = hoehen.map((_, i) => {
           const teil = hoehen.slice(Math.max(0, i - 2), Math.min(hoehen.length, i + 3));
@@ -1595,7 +1595,7 @@
         });
 
         // ★★★ Summiert wird über ALLE Punkte, ausgedünnt wird erst danach fürs
-        //     Bild. Andersherum — erst ausdünnen, dann summieren — hinge die
+        //     Bild. Andersherum (erst ausdünnen, dann summieren) hinge die
         //     ausgewiesene Steigung an der Streckenlänge: eine 100-km-Tour
         //     würde stärker ausgedünnt und käme deshalb mit weniger
         //     Höhenmetern je Kilometer heraus als dieselbe Strecke einzeln
@@ -1607,7 +1607,7 @@
           if (d > 0) auf += d; else ab -= d;
         }
 
-        // Fürs Bild reichen 400 Stützpunkte — mehr als das Profil breit ist,
+        // Fürs Bild reichen 400 Stützpunkte: mehr als das Profil breit ist,
         // wäre unsichtbar und stünde trotzdem im Markup.
         let zeichnung = glatt;
         if (zeichnung.length > 400) {
@@ -1638,7 +1638,7 @@
       // Bewusst im Browser (localStorage) und nicht auf dem Server: die Karte ist
       // ein read-only-Dienst ohne Anmeldung, ein Merkzettel pro Geraet passt dazu
       // besser als ein weiterer Dienst mit Datenhaltung. Zuhause, Arbeit, das
-      // Ferienhaus — solche Orte tippt man sonst bei jeder Route neu.
+      // Ferienhaus: solche Orte tippt man sonst bei jeder Route neu.
       const MERK_SCHLUESSEL = 'karten.gemerkte-orte';
 
       function merkListe() {
@@ -1653,7 +1653,7 @@
           localStorage.setItem(MERK_SCHLUESSEL, JSON.stringify(liste.slice(0, 60)));
           if (typeof merkKnopfAuffrischen === 'function') merkKnopfAuffrischen();
         } catch (e) {
-          warn('Ort konnte nicht gemerkt werden — Speicher des Browsers voll oder gesperrt.');
+          warn('Ort konnte nicht gemerkt werden: Speicher des Browsers voll oder gesperrt.');
         }
       }
 
@@ -1668,13 +1668,13 @@
         merkSchreiben(liste);
       }
 
-      // Stern-Knopf: blass, solange nichts gemerkt ist — dann sieht man auf
+      // Stern-Knopf: blass, solange nichts gemerkt ist, dann sieht man auf
       // einen Blick, dass die Liste leer ist, statt sie vergeblich zu oeffnen.
       const merkBtn = document.getElementById('merkbtn');
       function merkKnopfAuffrischen() {
         const n = merkListe().length;
         merkBtn.classList.toggle('leer', n === 0);
-        merkBtn.title = n ? `Gemerkte Orte (${n})` : 'Noch nichts gemerkt — langer Druck auf die Karte';
+        merkBtn.title = n ? `Gemerkte Orte (${n})` : 'Noch nichts gemerkt. Langer Druck auf die Karte';
       }
       merkBtn.onclick = () => {
         if (!merkListe().length) {
@@ -1719,7 +1719,7 @@
 
       // ---- Kartenmenue (Rechtsklick am Rechner, langer Druck am Handy) ------
       // Der „Mitte"-Knopf deckt nur die Routenplanung ab. Fuer alles andere
-      // fehlte ein Weg, einen beliebigen Punkt anzufassen — gerade unterwegs
+      // fehlte ein Weg, einen beliebigen Punkt anzufassen: gerade unterwegs
       // will man auf eine Stelle zeigen, nicht die Karte darunter schieben.
       const kmenue = document.getElementById('kmenue');
 
@@ -1735,9 +1735,9 @@
                                 lat.toFixed(4) + ', ' + lon.toFixed(4));
             if (name === null) return;
             merkeOrt(name.trim() || (lat.toFixed(4) + ', ' + lon.toFixed(4)), lat, lon);
-            // Rueckmeldung, wo der Ort gelandet ist — sonst merkt man ihn und
+            // Rueckmeldung, wo der Ort gelandet ist, sonst merkt man ihn und
             // sieht danach nichts, was sich geaendert haette.
-            hud.textContent = 'Gemerkt — über den Stern ★ neben der Suche';
+            hud.textContent = 'Gemerkt, über den Stern ★ neben der Suche';
           }],
           ['Koordinaten kopieren', () => koordinatenKopieren(lat, lon)],
           ['Wie weit komme ich?', () => erreichbarkeitZeigen(lat, lon)],
@@ -1763,7 +1763,7 @@
 
       // ---- Erreichbarkeit (Isochronen) --------------------------------------
       // Valhalla rechnet die Flaeche, die man in einer gegebenen Zeit erreicht.
-      // Das kostet keine eigenen Daten und keinen Bau — der Routing-Dienst kann
+      // Das kostet keine eigenen Daten und keinen Bau, der Routing-Dienst kann
       // es, seit es ihn gibt; es hat nur nie jemand danach gefragt. Seit die
       // Kacheln Hoehendaten tragen, ist der Radius fuer Rad und Fuss auch
       // ehrlich: bergauf kommt man weniger weit.
@@ -1793,7 +1793,7 @@
             contours: zeiten.map(t => ({ time: t })),
             polygons: true,
             // Ohne diese beiden wird die Flaeche ein Netz aus tausenden
-            // Zipfeln entlang jeder Sackgasse — unlesbar und schwer zu zeichnen.
+            // Zipfeln entlang jeder Sackgasse: unlesbar und schwer zu zeichnen.
             denoise: 0.4,
             generalize: 30,
           }),
@@ -1812,7 +1812,7 @@
             erreichbarkeitLoeschen();
             // ★ Valhalla liefert die Ringe von der groessten Kontur zur
             //   kleinsten. Gezeichnet wird in Listenreihenfolge, also muss die
-            //   kleinste zuletzt kommen — sonst deckt die 30-Minuten-Flaeche
+            //   kleinste zuletzt kommen, sonst deckt die 30-Minuten-Flaeche
             //   die 10-Minuten-Flaeche zu und alles sieht gleich weit aus.
             const teile = (daten.features || [])
               .slice()
@@ -1860,7 +1860,7 @@
       function koordinatenKopieren(lat, lon) {
         const text = lat.toFixed(5) + ', ' + lon.toFixed(5);
         // Die Zwischenablage gibt es nur im sicheren Kontext. Ohne HTTPS bleibt
-        // sie stumm — dann lieber sichtbar hinschreiben als so tun, als ginge es.
+        // sie stumm, dann lieber sichtbar hinschreiben als so tun, als ginge es.
         if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(text)
             .then(() => zeigen('Koordinaten kopiert: <code>' + text + '</code>'))
@@ -1876,7 +1876,7 @@
 
       // Langer Druck am Handy: MapLibre kennt dafuer kein eigenes Ereignis, und
       // 'contextmenu' loest auf Touch nicht zuverlaessig aus. Deshalb selbst
-      // messen — abgebrochen, sobald der Finger wandert (dann wird geschoben)
+      // messen: abgebrochen, sobald der Finger wandert (dann wird geschoben)
       // oder ein zweiter Finger dazukommt (dann wird gezoomt).
       let druckTimer = null, druckStart = null;
       map.on('touchstart', e => {
@@ -1927,7 +1927,7 @@
                    '(CC BY-NC-SA 4.0), enth&auml;lt modifizierte Copernicus-Sentinel-Daten' },
         { id: 'luftbild', label: 'Luftbild',
           // Die Scharf-Inseln liegen ueber der Flaeche und beginnen erst bei
-          // z19 — MapLibre zeigt dadurch von selbst die schaerfere Aufnahme,
+          // z19: MapLibre zeigt dadurch von selbst die schaerfere Aufnahme,
           // wo es sie gibt. Zwei davon: Heiligenhaus und Solingen-Mitte.
           // ★ NOTBEHELF minzoom 14, bis die Bilder mit Alphakanal neu gebaut
           //   sind: die Kacheln sind JPEG und koennen keine Transparenz tragen,
@@ -1937,7 +1937,7 @@
           //   Rahmen um das Luftbild erscheint. Ab z14 ist eine Kachel 2,4 km
           //   breit und der Saum faellt nicht mehr auf. Darunter zeigt die
           //   Karte einfach Karte oder Satellit. Nach dem Neubau entfaellt die
-          //   Zeile — dann traegt jede Kachel Alpha und der Rand ist echt weg.
+          //   Zeile, dann traegt jede Kachel Alpha und der Rand ist echt weg.
           quellen: [{ name: 'bild-umland',   datei: 'umland.pmtiles',   minzoom: 14 },
                     { name: 'bild-stadt',    datei: 'stadt.pmtiles',    minzoom: 19 },
                     { name: 'bild-solingen', datei: 'solingen.pmtiles', minzoom: 19 }],
@@ -1995,14 +1995,14 @@
       // ★ setStyle (Regionswechsel) wirft alle selbst gelegten Ebenen weg.
       //   Ohne dieses Wiedereinhaengen verschwaende das Luftbild lautlos, sobald
       //   jemand die Kartenregion umschaltet. Dasselbe gilt fuer Gelaende und
-      //   Gebaeude — und beim Gelaende faellt es besonders auf, weil die Karte
+      //   Gebaeude, und beim Gelaende faellt es besonders auf, weil die Karte
       //   gekippt bleibt und dabei flach wird.
       map.on('styledata', () => {
         if (bildmodus) bildebeneEinhaengen();
         reliefWiederherstellen();
       });
 
-      // Nur anbieten, was wirklich da ist — die Bilddaten entstehen in langen
+      // Nur anbieten, was wirklich da ist, die Bilddaten entstehen in langen
       // Rechenlaeufen und fehlen zwischendurch.
       Promise.all(BILDEBENEN.map(eb =>
         Promise.all(eb.quellen.map(q =>
@@ -2037,7 +2037,7 @@
       //   gelesen. MapLibres Vorgabe ist die Mapbox-Kodierung, und die rechnet
       //   dieselben Bytes voellig anders um: aus 200 m Hoehe wuerden rund
       //   1,3 Millionen. Das Ergebnis ist keine leichte Verzerrung, sondern eine
-      //   senkrechte Nadelwand — auffaellig, aber die Ursache sieht man ihr nicht an.
+      //   senkrechte Nadelwand: auffaellig, aber die Ursache sieht man ihr nicht an.
       const RELIEF_QUELLE = 'gelaende';
       const GEB_QUELLE = 'gebaeude';
       let gelaendeAn = false, gebaeudeAn = false;
@@ -2085,7 +2085,7 @@
 
       function gebaeudeEinhaengen() {
         // ★ ZWEI Gebäudequellen, bewusst übereinander:
-        //   Das LoD2-Modell ist genauer und vollständig — aber nur für die
+        //   Das LoD2-Modell ist genauer und vollständig, aber nur für die
         //   gebaute Fläche. Wer nach Köln oder Berlin scrollt, hätte dort gar
         //   keine Gebäude. Die Vektorkarte führt für ganz DE+NL ein `height`-
         //   Feld (in unserer Region bei 17 % der Gebäude gefüllt, anderswo
@@ -2117,7 +2117,7 @@
           map.addLayer({
             id: 'gebaeude-3d', type: 'fill-extrusion', source: GEB_QUELLE,
             'source-layer': 'gebaeude',
-            // Unter z14 waeren Gebaeude wenige Bildpunkte gross — sichtbar
+            // Unter z14 waeren Gebaeude wenige Bildpunkte gross: sichtbar
             // waere davon nichts, geladen alles.
             minzoom: 14,
             paint: {
@@ -2151,7 +2151,7 @@
         if (an) {
           gelaendeEinhaengen();
           // Flach betrachtet sieht 3D-Gelaende aus wie gar nichts. Einmal
-          // kippen macht den Sinn sofort sichtbar — aber nur, wenn der Nutzer
+          // kippen macht den Sinn sofort sichtbar, aber nur, wenn der Nutzer
           // die Kamera nicht schon selbst eingestellt hat.
           if (map.getPitch() < 10) map.easeTo({ pitch: 55, duration: 800 });
         } else {
@@ -2167,7 +2167,7 @@
         if (an && map.getPitch() < 10) map.easeTo({ pitch: 55, duration: 800 });
       }
 
-      // Nur anbieten, was gebaut ist — die Datensaetze entstehen in langen
+      // Nur anbieten, was gebaut ist, die Datensaetze entstehen in langen
       // Rechenlaeufen und fehlen zwischendurch.
       const reliefsel = document.getElementById('reliefsel');
       Promise.all([
@@ -2345,7 +2345,7 @@
           .then(res => res.ok ? r : null).catch(() => null)
       )).then(vorhanden => {
         const da = vorhanden.filter(Boolean);
-        if (!da.length) { warn('Keine Kartendatei gefunden — extract-maps.sh läuft?'); return; }
+        if (!da.length) { warn('Keine Kartendatei gefunden: extract-maps.sh läuft?'); return; }
         if (da[0].id !== aktuell.id) {           // bevorzugte Karte fehlt -> umschwenken
           aktuell = da[0];
           map.setStyle(styleFuer(aktuell));

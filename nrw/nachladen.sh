@@ -3,7 +3,7 @@
 #
 # Nach jeder Aenderung an `luftbilder/dop-auswahl.py` muessen die abgeleiteten
 # Datensaetze mitwachsen, sonst liegt das Gelaende neben dem Bild. Die
-# Kachellisten leiten sich aus `dop-liste.tsv` ab — dieses Skript ruft nur die
+# Kachellisten leiten sich aus `dop-liste.tsv` ab: dieses Skript ruft nur die
 # Werkzeuge in der richtigen Reihenfolge auf.
 #
 # Alle drei Laeufe sind wiederaufnehmbar: was in der richtigen Groesse daliegt,
@@ -17,7 +17,7 @@ melde "=== Luftbilder ==="
 /opt/luftbilder/fetch-dop.sh 2>&1 | tail -3 | tee -a "$LOG"
 
 melde "=== Hoehenmodell ==="
-# Kataloge liegen schon lokal — die Auswahl rechnet nur die Schnittmenge neu.
+# Kataloge liegen schon lokal, die Auswahl rechnet nur die Schnittmenge neu.
 python3 /opt/nrw-werkzeug/nrw-auswahl.py dgm1 > /opt/hoehendaten/dgm1-liste.tsv 2>>"$LOG"
 /opt/nrw-werkzeug/hole-nrw.sh dgm1 /opt/hoehendaten/dgm1-liste.tsv \
     /opt/hoehendaten/quelle 2>&1 | tail -2 | tee -a "$LOG"

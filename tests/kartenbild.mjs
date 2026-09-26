@@ -2,14 +2,14 @@
 //
 // Warum nicht einfach `chromium --screenshot`: der Schuss faellt dann sofort
 // nach dem Ladeereignis, lange bevor MapLibre Kacheln geholt und gezeichnet
-// hat. Der uebliche Ausweg `--virtual-time-budget` ist hier eine Falle —
+// hat. Der uebliche Ausweg `--virtual-time-budget` ist hier eine Falle:
 // gemessen am 2026-08-29 auf node1 (Chromium 124, SwiftShader): unter
 // virtueller Zeit feuert `requestAnimationFrame` KEIN EINZIGES MAL. MapLibre
 // malt aber ausschliesslich in rAF. Das Ergebnis ist ein Bild mit vollstaendiger
-// Bedienoberflaeche und leerer Karte — es sieht exakt aus wie fehlende
+// Bedienoberflaeche und leerer Karte, es sieht exakt aus wie fehlende
 // Kartendaten und nicht wie ein Fehler des Werkzeugs.
 //
-// Deshalb: echte Zeit, und die Fertigstellung wird gemessen statt geraten —
+// Deshalb: echte Zeit, und die Fertigstellung wird gemessen statt geraten:
 // es wird so lange fotografiert, bis zwei Aufnahmen in Folge Byte fuer Byte
 // gleich sind. Dann ist nichts mehr in Bewegung.
 //
@@ -98,7 +98,7 @@ async function fotografiere(name, hash, knoepfe) {
   konsole = []; netz = []; ausnahmen = []; abgebrochen = 0;
   // ★ Ein reines Hash-Wechseln laedt die Seite NICHT neu, MapLibre wuerde dann
   //   nur hinschwenken und der vorige Bildmodus bliebe stehen. Also erst auf
-  //   about:blank, dann die Zieladresse — jede Ansicht startet sauber.
+  //   about:blank, dann die Zieladresse, damit jede Ansicht sauber startet.
   await ruf('Page.navigate', { url: 'about:blank' });
   await schlaf(200);
   await ruf('Page.navigate', { url });

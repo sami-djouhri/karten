@@ -7,7 +7,7 @@
 #   2. GeoJSON -> Vektorkacheln (MVT) -> MBTILES
 #
 # ★ Kein tippecanoe noetig: GDAL schreibt MVT selbst. Ein Werkzeug weniger,
-#   das gepflegt und aktuell gehalten werden muss — und das GDAL-Image liegt
+#   das gepflegt und aktuell gehalten werden muss, und das GDAL-Image liegt
 #   fuer die Bildkacheln ohnehin auf der Platte.
 #
 # ★★ MINZOOM=13: darunter waeren Gebaeude wenige Bildpunkte gross, die Kacheln

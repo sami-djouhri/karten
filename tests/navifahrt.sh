@@ -8,7 +8,7 @@
 # ★ Gefahren wird ueber den HTTPS-Vhost, nicht ueber die LAN-IP:
 #   navigator.geolocation gibt es nur im sicheren Kontext, und ohne Standort
 #   ist der Folgemodus nicht pruefbar. Der naheliegende Schalter
-#   --unsafely-treat-insecure-origin-as-secure traegt NICHT — gemessen am
+#   --unsafely-treat-insecure-origin-as-secure traegt NICHT: gemessen am
 #   2026-08-29: isSecureContext blieb false und getCurrentPosition antwortete
 #   "Only secure origins are allowed", auch mit --user-data-dir. Der HTTPS-Weg
 #   ist ohnehin der, den ein Mensch benutzt.

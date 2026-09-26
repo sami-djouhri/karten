@@ -3,11 +3,11 @@
 #
 # Warum nicht alles parallel starten: der LXC hat vier Kerne, und jeder der
 # Laeufe will drei davon. Gleichzeitig gestartet werden alle drei langsamer als
-# hintereinander, weil sie sich gegenseitig aus dem Plattenpuffer draengen —
+# hintereinander, weil sie sich gegenseitig aus dem Plattenpuffer draengen,
 # und Valhalla, das im selben LXC bedient, wird dabei zaeh.
 #
 # Die Kette ist bewusst dumm: sie wartet, ruft auf, protokolliert. Ein
-# fehlgeschlagener Schritt haelt die spaeteren NICHT auf — Terrain und Gebaeude
+# fehlgeschlagener Schritt haelt die spaeteren NICHT auf: Terrain und Gebaeude
 # haengen nicht voneinander ab, und ein Abbruch beim ersten soll nicht die
 # ganze Nacht kosten.
 #
@@ -36,7 +36,7 @@ schritt() {
         melde "OK $name nach $(( (SECONDS - start) / 60 )) min"
     else
         # Kein `exit`: die folgenden Schritte sind unabhaengig.
-        melde "FEHLGESCHLAGEN $name (rc=$?) — Kette laeuft weiter"
+        melde "FEHLGESCHLAGEN $name (rc=$?): Kette laeuft weiter"
     fi
 }
 

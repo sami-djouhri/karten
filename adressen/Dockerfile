@@ -2,7 +2,7 @@
 #
 # osmium-tool filtert die 4,5-GB-Rohdatei in C++ vor (das in Python zu tun waere
 # um Groessenordnungen langsamer), pyosmium liest die kleinen Reste dann bequem.
-# Beides aus Debian-Paketen statt aus dem Netz nachgezogen — hier soll nichts
+# Beides aus Debian-Paketen statt aus dem Netz nachgezogen: hier soll nichts
 # laufen, was niemand geprueft hat.
 #
 # Das Bild wird NUR zum Bauen des Index gebraucht, nicht im Betrieb. Der

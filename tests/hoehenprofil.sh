@@ -23,7 +23,7 @@ quelle, ziel = sys.argv[1], sys.argv[2]
 text = open(quelle).read()
 treffer = re.search(r'(      function hoehenAbschnitt\(beine\) \{.*?\n      \})', text, re.S)
 if not treffer:
-    sys.exit("hoehenAbschnitt() nicht in index.html gefunden — umbenannt oder umgebaut?")
+    sys.exit("hoehenAbschnitt() nicht in index.html gefunden: umbenannt oder umgebaut?")
 open(ziel, "w").write(treffer.group(1))
 PY
 
@@ -78,7 +78,7 @@ pruefe('2600 Rohwerte -> Deckel 400 Stuetzpunkte', punkte <= 400, `${punkte} Pun
 // ★ Die Steigungssumme darf NICHT an der Streckenlaenge haengen. Sie wird
 //   deshalb ueber alle Punkte gerechnet und erst danach fuers Bild ausgeduennt.
 //   Andersherum kaeme eine lange Tour mit weniger Hoehenmetern je Kilometer
-//   heraus als dieselbe Strecke einzeln berechnet — gemessen 295 statt 343 m.
+//   heraus als dieselbe Strecke einzeln berechnet: gemessen 295 statt 343 m.
 const welle = [];
 for (let i = 0; i < 100; i++) welle.push(200 + 40 * Math.sin(i / 16));
 const kurz = welle;                                    // 100 Punkte

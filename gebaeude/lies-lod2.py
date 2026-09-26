@@ -3,22 +3,22 @@
 
     python3 lies-lod2.py <quellverzeichnis> <ziel.geojsonl> [prozesse]
 
-Ausgabe ist zeilenweises GeoJSON (eine Feature je Zeile) — bei ueber einer
+Ausgabe ist zeilenweises GeoJSON (eine Feature je Zeile), bei ueber einer
 halben Million Gebaeuden passt keine FeatureCollection sinnvoll in den Speicher,
 und `ogr2ogr` liest das Format direkt.
 
 Je Gebaeude: Grundriss als Polygon (WGS84) + `hoehe` in Metern. Mehr braucht
-MapLibres `fill-extrusion` nicht — und mehr kann es auch nicht darstellen.
+MapLibres `fill-extrusion` nicht, und mehr kann es auch nicht darstellen.
 
 ★ WAS DABEI VERLOREN GEHT, damit sich spaeter niemand wundert:
   LoD2 beschreibt echte Dachformen (Sattel, Walm, Pult) als 3D-Koerper.
   `fill-extrusion` kann nur senkrechte Klotze mit flachem Deckel. Wir nehmen
-  daher den Grundriss und ziehen ihn auf Firsthoehe hoch — die Silhouette der
+  daher den Grundriss und ziehen ihn auf Firsthoehe hoch, die Silhouette der
   Stadt stimmt, das einzelne Dach nicht. Echte Dachformen braeuchten 3D-Tiles
   oder glTF, was MapLibre nicht nativ kann.
 
 ★★ DIE ACHSENREIHENFOLGE-FALLE: GDAL 3 haelt sich bei EPSG:4326 an die
-   offizielle Definition, und die sagt (Breite, Laenge) — nicht (Laenge, Breite).
+   offizielle Definition, und die sagt (Breite, Laenge), nicht (Laenge, Breite).
    Ohne OAMS_TRADITIONAL_GIS_ORDER landen alle Gebaeude vertauscht irgendwo im
    Indischen Ozean. Der Fehler ist gross und offensichtlich, sobald man hinsieht,
    aber die Transformation selbst meldet nichts.
@@ -26,7 +26,7 @@ MapLibres `fill-extrusion` nicht — und mehr kann es auch nicht darstellen.
 ★★★ NAMENSRAEUME WERDEN IGNORIERT: NRW liefert je nach Jahrgang CityGML 1.0
     oder 2.0, und die Namensraum-URLs unterscheiden sich. Ein Parser, der auf
     '{http://www.opengis.net/citygml/building/2.0}Building' prueft, findet in
-    aelteren Kacheln schlicht nichts — und meldet keinen Fehler, sondern null
+    aelteren Kacheln schlicht nichts, und meldet keinen Fehler, sondern null
     Gebaeude. Deshalb wird ueberall nur der lokale Elementname verglichen.
 """
 import json

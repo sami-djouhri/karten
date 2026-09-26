@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""baue-adressindex.py — macht aus germany-latest.osm.pbf einen Adressindex
+"""baue-adressindex.py: macht aus germany-latest.osm.pbf einen Adressindex
 mit Hausnummern, als eine SQLite-Datei.
 
 Warum kein Nominatim: Nominatim will fuer Deutschland grob 100 GB Datenbank und
 16+ GB Arbeitsspeicher; auf den vorhandenen 5-7 GB laeuft allein der Import
-tagelang. Was hier wirklich gebraucht wird — „Ort, dann Strasse, dann Nummer" —
+tagelang. Was hier wirklich gebraucht wird („Ort, dann Strasse, dann Nummer"),
 sind drei Tabellen und zwei Indizes. Faktor zwanzig leichter, und es passt zum
 Hausprinzip Eigen-System statt Fremd-Stack.
 
@@ -12,13 +12,13 @@ Was dabei fehlt, ist das freie Zerlegen beliebiger Suchtexte („Hauptstr 12 bei
 Muenchen"). Mit gefuehrter Eingabe faellt das nicht ins Gewicht.
 
 ★ Der Ablauf ist in Stufen geteilt, jede mit eigener Ausgabedatei. Ein
-  abgebrochener Lauf setzt dort wieder an, wo er stehengeblieben ist — bei
+  abgebrochener Lauf setzt dort wieder an, wo er stehengeblieben ist, bei
   einer Rohdatei dieser Groesse ist das kein Luxus, sondern Notwehr.
 
 ★★ Der Speicher ist der Engpass, nicht die Platte. Deshalb wandert NICHTS in
    grosse Python-Woerterbuecher: die Rohdaten gehen zeilenweise nach SQLite,
    und das Zusammenfuehren und Entdoppeln macht SQLite auf der Platte. Ein
-   `dict` mit 20 Millionen Wegen waere gut 1,5 GB gewesen — mehr als frei ist.
+   `dict` mit 20 Millionen Wegen waere gut 1,5 GB gewesen: mehr als frei ist.
 
 Aufruf (im Container, siehe baue-index.sh):
     python3 baue-adressindex.py
@@ -52,7 +52,7 @@ def lauf(*befehl):
 
 
 # --- Schreibformen ----------------------------------------------------------
-# Zwei Formen je Name, sonst faellt je eine Eingabeart durch — dieselbe Lehre
+# Zwei Formen je Name, sonst faellt je eine Eingabeart durch: dieselbe Lehre
 # wie in der Ortssuche im Frontend:
 #   "Höseler Straße" -> hoeseler strasse  (deutsch umschrieben)  <- "Hoeseler"
 #   "Höseler Straße" -> hoseler strasse   (nur Zeichen gestrippt) <- "Hoseler"
@@ -87,7 +87,7 @@ def sortierschluessel(nummer):
 
     ★ Nicht `c.isdigit()` benutzen: das ist auch fuer hochgestellte Ziffern
       wahr, `int()` kann sie aber nicht lesen. In den echten Daten steht die
-      Hausnummer „21¹" — damit ist der ganze Lauf nach einer Stunde gescheitert.
+      Hausnummer „21¹", damit ist der ganze Lauf nach einer Stunde gescheitert.
     """
     ziffern = ""
     for c in nummer:
@@ -134,7 +134,7 @@ class WegLeser(osmium.SimpleHandler):
             return
         # ★ Der ERSTE Knoten des Gebaeudeumrisses reicht als Position. Der
         #   echte Schwerpunkt waere genauer, kostet aber alle Knoten des Wegs
-        #   statt einem — bei einem Wohnhaus liegen beide wenige Meter
+        #   statt einem, bei einem Wohnhaus liegen beide wenige Meter
         #   auseinander, und zum Navigieren ist das ohne Belang.
         knoten = w.nodes[0].ref
         self.stapel.append((knoten, t.get("addr:street", ""), hnr,
@@ -155,7 +155,7 @@ class WegLeser(osmium.SimpleHandler):
 
 # --- Stufe 5+6: Knoten einlesen ----------------------------------------------
 class KnotenPosLeser(osmium.SimpleHandler):
-    """Nur Position — fuer die Knoten, die von Adresswegen gebraucht werden."""
+    """Nur Position, fuer die Knoten, die von Adresswegen gebraucht werden."""
 
     def __init__(self, db):
         super().__init__()
@@ -221,7 +221,7 @@ def rohdatenbank():
     db.execute("CREATE TABLE IF NOT EXISTS knoten_pos (id INTEGER PRIMARY KEY,"
                " lat REAL, lon REAL)")
     # ★ Merkzettel der abgeschlossenen Stufen. Ohne ihn haette der zweite Lauf
-    #   die 16 Millionen Wegadressen ein ZWEITES Mal in `roh` geschoben — die
+    #   die 16 Millionen Wegadressen ein ZWEITES Mal in `roh` geschoben, die
     #   uebrigen Stufen erkennen ihren Zustand an ihrer Ausgabe, Stufe 7 kann
     #   das nicht, weil sie in eine bereits gefuellte Tabelle schreibt.
     db.execute("CREATE TABLE IF NOT EXISTS fertig (stufe TEXT PRIMARY KEY)")
@@ -251,7 +251,7 @@ def rohdaten_sammeln():
 
     if not os.path.exists(WEG_KNOTEN):
         sag("Stufe 4: Positionen dieser Knoten aus der Rohdatei holen")
-        # osmium getid loest die IDs in einem Durchgang auf — in C++, mit einem
+        # osmium getid loest die IDs in einem Durchgang auf, in C++, mit einem
         # kompakten ID-Speicher. Derselbe Schritt in Python waere ein Abgleich
         # von 400 Millionen Knoten gegen eine Menge im Arbeitsspeicher.
         lauf("osmium", "getid", "--overwrite", "-i", GESUCHTE_IDS,
@@ -301,7 +301,7 @@ def index_bauen():
                " lat REAL, lon REAL, sortier INTEGER)")
 
     # Orte: ein Eintrag je Ortsname. Die Lage ist der Mittelwert seiner
-    # Adressen — das trifft den bewohnten Kern besser als der Verwaltungspunkt.
+    # Adressen, das trifft den bewohnten Kern besser als der Verwaltungspunkt.
     sag("   Orte")
     db.execute("ATTACH DATABASE ? AS r", (ROH,))
     db.execute(
@@ -334,7 +334,7 @@ def index_bauen():
     db.commit()
     db.execute("DETACH DATABASE r")
 
-    # Suchformen und Sortierschluessel nachtragen — in Python, weil SQLite die
+    # Suchformen und Sortierschluessel nachtragen, in Python, weil SQLite die
     # deutschen Umschreibungen nicht kennt.
     sag("   Suchformen")
     for tabelle in ("orte", "strassen"):
@@ -383,7 +383,7 @@ def main():
     rohdb.close()
     zahlen = index_bauen()
     groesse = os.path.getsize(ZIEL) / 1e9
-    sag(f"fertig in {(time.monotonic() - start) / 60:.0f} min — "
+    sag(f"fertig in {(time.monotonic() - start) / 60:.0f} min, "
         f"{zahlen['orte']} Orte, {zahlen['strassen']} Strassen, "
         f"{zahlen['hausnummern']} Hausnummern, {groesse:.2f} GB")
     sag(f"Zwischenstaende in {ARB} koennen jetzt geloescht werden.")

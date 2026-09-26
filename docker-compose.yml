@@ -48,7 +48,7 @@ services:
       homelab.category: "offline-wissen"
 
   # Adresssuche mit Hausnummern. Schlaegt nur in einer SQLite-Datei nach und
-  # gibt JSON zurueck — reine Standardbibliothek, keine Fremdpakete (siehe
+  # gibt JSON zurueck: reine Standardbibliothek, keine Fremdpakete (siehe
   # adressen/dienst.py). Kein Port nach aussen: erreichbar ist er allein ueber
   # /adressen/ im nginx nebenan.
   adresssuche:
@@ -93,7 +93,7 @@ services:
       homelab.category: "offline-wissen"
 
 # ★ Festes Subnetz statt Selbstvergabe (Hausregel): eine automatisch vergebene
-#   Spanne kann das Speedport-LAN ueberdecken — genau dieser Vorfall am
+#   Spanne kann das Speedport-LAN ueberdecken: genau dieser Vorfall am
 #   2026-06-16. Die 172.23.14x-Reihe ist die des Offline-Wissens:
 #   kiwix .140, calibre .141, knowledge-api .142, navidrome .143, karten .144.
 networks:

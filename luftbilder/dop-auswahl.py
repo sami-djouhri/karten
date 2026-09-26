@@ -2,7 +2,7 @@
 """Waehlt aus dem NRW-DOP-Katalog die Kacheln fuer das Karten-Portal aus.
 
 Drei Bereiche, aus denen spaeter drei Kachelsaetze mit verschiedener Schaerfe
-werden — grob ueber die Flaeche, scharf da, wo man wirklich hinschaut:
+werden: grob ueber die Flaeche, scharf da, wo man wirklich hinschaut:
 
     aussen     26x35 km  Heiligenhaus/Velbert bis Solingen/Remscheid, bis z19
     innen       8x8  km  Heiligenhaus,   bis z20
@@ -15,10 +15,10 @@ Der Bau liest die Datei dreimal mit verschiedenen Filtern (`alle` fuer z19).
 Kein pyproj auf host, deshalb die UTM-Vorwaertsprojektion von Hand (Karney/
 Snyder, Standardreihen). Fuer die Kachelwahl reicht das mit Abstand: eine Kachel
 ist 1000 m breit, die Reihen sind auf Zentimeter genau. ETRS89 gegen WGS84 macht
-in NRW unter einem Meter aus — ebenfalls belanglos hier.
+in NRW unter einem Meter aus: ebenfalls belanglos hier.
 
 ★ Der Katalog wird selbst geholt und neben dem Skript abgelegt. Frueher wurde er
-  unter /tmp erwartet — nach einem Neustart des LXC war er weg und das Skript
+  unter /tmp erwartet, nach einem Neustart des LXC war er weg und das Skript
   brach mit FileNotFoundError ab, obwohl nichts kaputt war.
 """
 import json
@@ -61,7 +61,7 @@ def wgs84_nach_utm32(lat_grad, lon_grad):
 
 
 def kachel(lat, lon):
-    """Kachelindex (Ost/Nord in Kilometern) — die Kachel deckt [km, km+1)."""
+    """Kachelindex (Ost/Nord in Kilometern), die Kachel deckt [km, km+1)."""
     e, n = wgs84_nach_utm32(lat, lon)
     return int(e // 1000), int(n // 1000)
 
@@ -125,7 +125,7 @@ for satz in daten.get("datasets", []):
 
 print(f"Katalog: {len(katalog):,} Kacheln", file=sys.stderr)
 if not katalog:
-    sys.exit("FEHLER: Katalog leer — hat sich das Format geaendert?")
+    sys.exit("FEHLER: Katalog leer. Hat sich das Format geaendert?")
 
 # --- Auswahl -----------------------------------------------------------------
 gewaehlt = {}

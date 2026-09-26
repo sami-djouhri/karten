@@ -17,7 +17,7 @@
 #   endet der Lauf in dem Fall mit einem Rueckgabewert ungleich 0.
 #
 # ★ Warum ein Treiber statt `chromium --screenshot`: siehe Kopf von
-#   kartenbild.mjs. Kurz — unter --virtual-time-budget feuert requestAnimationFrame
+#   kartenbild.mjs. Kurz, unter --virtual-time-budget feuert requestAnimationFrame
 #   nicht, MapLibre malt nur dort, und das leere Bild sieht aus wie fehlende
 #   Kartendaten statt wie ein kaputtes Werkzeug.
 set -euo pipefail

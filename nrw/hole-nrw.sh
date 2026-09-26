@@ -4,7 +4,7 @@
 #   ./hole-nrw.sh dgm1 /opt/hoehendaten/dgm1-liste.tsv /opt/hoehendaten/quelle
 #   ./hole-nrw.sh lod2 /opt/gebaeude/lod2-liste.tsv    /opt/gebaeude/quelle
 #
-# Quelle: Datenlizenz Deutschland Zero (dl-de/zero-2-0) — echtes Open Data mit
+# Quelle: Datenlizenz Deutschland Zero (dl-de/zero-2-0), echtes Open Data mit
 # ausdruecklichem Massendownload, kein Abernten fremder Kachelserver.
 #
 # ★ Groessenpruefung gegen den Katalogwert ist der Kern: eine halbe Datei ist
@@ -40,7 +40,7 @@ hole() {
     local ist
     ist=$(stat -c%s "$pfad")
     if [ "$ist" != "$soll" ]; then
-        echo "GROESSE FALSCH: $name ($ist statt $soll) — verworfen" >&2
+        echo "GROESSE FALSCH: $name ($ist statt $soll), verworfen" >&2
         rm -f "$pfad"
         return 1
     fi
@@ -53,7 +53,7 @@ echo "Hole $anzahl Kacheln ($1) nach $ZIEL (${PARALLEL} parallel) …"
 
 cut -f1,2 "$LISTE" \
   | xargs -P "$PARALLEL" -n 2 bash -c 'hole "$0" "$1"' \
-  || echo "WARNUNG: mindestens eine Kachel fehlte — Skript erneut laufen lassen" >&2
+  || echo "WARNUNG: mindestens eine Kachel fehlte. Skript erneut laufen lassen" >&2
 
 da=$(find "$ZIEL" -maxdepth 1 -type f | wc -l)
 echo "fertig: $da von $anzahl Kacheln, $(du -sh "$ZIEL" | cut -f1)"

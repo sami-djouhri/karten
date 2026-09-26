@@ -5,18 +5,18 @@
 
 Die Vektorkarte fuehrt 286 POI-Arten, das mitgelieferte Sprite deckt davon 17
 ab. Gemessen an der Kartenregion sind das 1552 von 3767 Objekten der
-Alltagskategorien — Parken, Kindergarten, Kirche, Tankstelle, Bank und
+Alltagskategorien: Parken, Kindergarten, Kirche, Tankstelle, Bank und
 Apotheke fehlten komplett.
 
 ★ Gezeichnet wird hier, nicht heruntergeladen. Fertige Icon-Saetze (Maki,
   Temaki) liegen als SVG vor und braeuchten einen SVG-Renderer, den weder das
-  GDAL-Abbild noch node1 hat — und eine neue Laufzeit-Abhaengigkeit widerspricht
+  GDAL-Abbild noch node1 hat, und eine neue Laufzeit-Abhaengigkeit widerspricht
   dem Offline-Anspruch des Portals. Geometrische Primitive mit Supersampling
   kommen ohne alles aus und treffen den Stil genauer, weil das Farbschema
   direkt aus dem vorhandenen Sheet uebernommen wird.
 
 ★★ Das Sheet wird NEBEN dem Original aufgebaut und erst am Ende getauscht.
-   Ein abgebrochener Lauf darf kein halbes Sprite hinterlassen — dann faenden
+   Ein abgebrochener Lauf darf kein halbes Sprite hinterlassen, dann faenden
    auch die 53 bestehenden Symbole ihren Platz nicht mehr und die Karte waere
    ohne Strassenschilder.
 """
@@ -65,7 +65,7 @@ def kreis(maske, cx, cy, r, wert=1.0):
 
 def plakette(einzug=0.0, radius=3.4):
     """Die Grundform der Protomaps-Symbole: abgerundetes Quadrat ueber fast das
-    ganze Feld — KEIN Kreis. Aus dem vorhandenen Sheet abgemessen: 19x19 voll
+    ganze Feld, KEIN Kreis. Aus dem vorhandenen Sheet abgemessen: 19x19 voll
     gedeckt, nur die vier Ecken mit Radius ~3,4 gerundet, aussen ein Rand von
     einem Bildpunkt in der Symbolfarbe."""
     m = leer()
@@ -94,7 +94,7 @@ def rechteck(maske, x0, y0, x1, y1, wert=1.0):
 
 
 def polygon(maske, punkte, wert=1.0):
-    """Punkt-in-Polygon ueber Strahlensatz — reicht fuer konvexe Formen."""
+    """Punkt-in-Polygon ueber Strahlensatz: reicht fuer konvexe Formen."""
     pts = [(x * UEBER, y * UEBER) for x, y in punkte]
     y, x = np.mgrid[:G, :G]
     drin = np.zeros((G, G), dtype=bool)
@@ -169,7 +169,7 @@ def sym_kirche(m):
 
 def sym_sport(m):
     # Ball: Umriss plus Fuenfeck in der Mitte. Ein durchgehendes Kreuz sah aus
-    # wie ein Fadenkreuz — deshalb die Naehte als Fussballmuster.
+    # wie ein Fadenkreuz, deshalb die Naehte als Fussballmuster.
     kreis(m, 9.5, 9.5, 6.2)
     kreis(m, 9.5, 9.5, 4.9, 0.0)
     ecken = [(9.5 + 3.0 * np.cos(np.radians(-90 + i * 72)),
@@ -217,7 +217,7 @@ def sym_rathaus(m):
 
 
 def sym_kindergarten(m):
-    # Bauklotz-Turm. Der erste Entwurf war ein Ballon — der sah aus wie ein Baum.
+    # Bauklotz-Turm. Der erste Entwurf war ein Ballon, der sah aus wie ein Baum.
     rechteck(m, 4.6, 11.0, 9.0, 15.2)                   # unten links
     rechteck(m, 9.6, 11.0, 14.0, 15.2)                  # unten rechts
     rechteck(m, 7.1, 6.4, 11.5, 10.4)                   # oben
@@ -257,7 +257,7 @@ def sym_polizei(m):
 
 def sym_recycling(m):
     # Drei Pfeile im Ring. Der erste Entwurf setzte die Dreiecke frei im Raum
-    # und wirkte zerstreut — jetzt bilden Balken einen geschlossenen Ring, an
+    # und wirkte zerstreut, jetzt bilden Balken einen geschlossenen Ring, an
     # dessen Enden die Spitzen sitzen.
     r = 5.2
     ecken = [(9.5 + r * np.cos(np.radians(-90 + i * 120)),
@@ -311,7 +311,7 @@ SYMBOLE = [
 
 
 def zeichne(art, form):
-    """Ein Symbol als RGBA-Feld in Zielgroesse — im Stil der vorhandenen.
+    """Ein Symbol als RGBA-Feld in Zielgroesse, im Stil der vorhandenen.
 
     Aufbau wie im Original-Sheet abgemessen: aussen die Plakette in
     Symbolfarbe, darin um einen Bildpunkt eingerueckt die helle Flaeche, darauf
@@ -347,7 +347,7 @@ def main():
     d = json.load(open(os.path.join(ordner, "light.json")))
     neu = [(n, a, f) for n, a, f in SYMBOLE if n not in d]
     if not neu:
-        print("nichts zu tun — alle Symbole schon im Sheet")
+        print("nichts zu tun: alle Symbole schon im Sheet")
         return
     print("ergaenze %d Symbole: %s" % (len(neu), ", ".join(n for n, _, _ in neu)))
 

@@ -2,7 +2,7 @@
 # Prueft, dass das grosse Inline-Skript in static/index.html ueberhaupt parst,
 # und dass style.json gueltiges JSON ist.
 #
-# Warum das noetig ist: das Frontend hat bewusst kein Bausystem — eine Datei,
+# Warum das noetig ist: das Frontend hat bewusst kein Bausystem, eine Datei,
 # 1800 Zeilen Skript, direkt ausgeliefert. Ein Tippfehler faellt damit erst im
 # Browser auf, und zwar als komplett leere Karte. Diese zwei Sekunden fangen ihn
 # vorher ab.
@@ -26,7 +26,7 @@ node --check "$tmp/inline.js" && echo "  Skript parst"
 python3 -c "import json; s=json.load(open('static/style.json')); print(f'  style.json gueltig, {len(s[\"layers\"])} Ebenen')"
 python3 -c "import json; json.load(open('static/manifest.webmanifest')); print('  manifest gueltig')"
 
-# Jede Ebene im Stil muss eine Quelle haben, die es auch gibt — ein Tippfehler
+# Jede Ebene im Stil muss eine Quelle haben, die es auch gibt, ein Tippfehler
 # im Quellnamen laesst MapLibre die Ebene stillschweigend weglassen.
 python3 - <<'PYEOF'
 import json, sys

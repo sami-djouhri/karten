@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""ernte-s2.py — holt das wolkenfreie Sentinel-2-Mosaik fuer DE+NL als MBTILES.
+"""ernte-s2.py: holt das wolkenfreie Sentinel-2-Mosaik fuer DE+NL als MBTILES.
 
 Quelle: EOX „Sentinel-2 cloudless" (tiles.maps.eox.at), Lizenz CC BY-NC-SA 4.0.
-Die Namensnennung steht im Kartenstil und MUSS dort bleiben — sie ist Bedingung
+Die Namensnennung steht im Kartenstil und MUSS dort bleiben, sie ist Bedingung
 der Lizenz, nicht Hoeflichkeit.
 
 ★ Warum nur bis z13 und nicht z14:
   Sentinel-2 loest 10 m je Bildpunkt auf. z13 entspricht auf unserer Breite
-  12 m/Bildpunkt, z14 waeren 6 m — also feiner als die Daten ueberhaupt hergeben.
+  12 m/Bildpunkt, z14 waeren 6 m, also feiner als die Daten ueberhaupt hergeben.
   z14 kostet 340.000 zusaetzliche Abrufe und liefert dabei kein einziges neues
   Detail, nur weichgerechnete Zwischenwerte. Beim Hineinzoomen ueber z13 hinaus
-  streckt MapLibre die vorhandene Kachel — optisch dasselbe Ergebnis, ohne einen
+  streckt MapLibre die vorhandene Kachel: optisch dasselbe Ergebnis, ohne einen
   fremden Gratisdienst mit dem Vierfachen zu belasten.
   Gesamt so: rund 114.000 Kacheln statt 453.000.
 
 ★ Ruecksicht auf die Quelle ist hier kein Beiwerk: das ist ein fremder
   Gratisdienst. Deshalb gedrosselte Rate, ehrliche Kennung im User-Agent,
-  Rueckzug bei 429/5xx — und der Lauf ist wiederaufnehmbar, damit ein Abbruch
+  Rueckzug bei 429/5xx, und der Lauf ist wiederaufnehmbar, damit ein Abbruch
   nicht bedeutet, dass alles noch einmal geholt werden muss.
 
 Aufruf:  setsid nohup ./ernte-s2.py > ernte.log 2>&1 < /dev/null &
@@ -35,7 +35,7 @@ import urllib.request
 JAHRGANG = os.environ.get("JAHRGANG", "2024")
 VORLAGE = ("https://tiles.maps.eox.at/wmts/1.0.0/"
            f"s2cloudless-{JAHRGANG}_3857/default/g/{{z}}/{{y}}/{{x}}.jpg")
-# ★ Reihenfolge im Pfad ist z/ZEILE/SPALTE, also z/y/x — nicht z/x/y.
+# ★ Reihenfolge im Pfad ist z/ZEILE/SPALTE, also z/y/x, nicht z/x/y.
 #   Beide Varianten antworten mit HTTP 200, die vertauschte liefert nur eine
 #   voellig andere Weltgegend. Gegenprobe war die Dateigroesse ueber Land.
 
@@ -46,7 +46,7 @@ ARBEITER = int(os.environ.get("ARBEITER", "5"))
 RATE = float(os.environ.get("RATE", "15"))     # Abrufe je Sekunde, global
 KENNUNG = ("homelab-offline-karten/1.0 (privater Offline-Kartenspeicher, "
            "nicht-kommerziell)")
-ATTRIBUTION = ("Sentinel-2 cloudless by EOX IT Services GmbH — "
+ATTRIBUTION = ("Sentinel-2 cloudless by EOX IT Services GmbH: "
                "enthaelt modifizierte Copernicus-Sentinel-Daten, CC BY-NC-SA 4.0")
 
 
@@ -68,7 +68,7 @@ def kacheln(z):
 
 
 class Bremse:
-    """Eimer mit Wertmarken — deckelt die Abrufe je Sekunde ueber alle Arbeiter."""
+    """Eimer mit Wertmarken: deckelt die Abrufe je Sekunde ueber alle Arbeiter."""
 
     def __init__(self, rate):
         self.rate = rate
@@ -96,9 +96,9 @@ def hole(url, bremse, versuche=5):
                 return antwort.read()
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                return None                      # Kachel gibt es nicht — in Ordnung
+                return None                      # Kachel gibt es nicht, in Ordnung
             if e.code in (429, 500, 502, 503, 504):
-                # Rueckzug. Bei 429 deutlich laenger — der Dienst sagt uns
+                # Rueckzug. Bei 429 deutlich laenger, der Dienst sagt uns
                 # gerade, dass wir zu schnell sind.
                 pause = (10 if e.code == 429 else 2) * (2 ** versuch)
                 print(f"   HTTP {e.code}, warte {pause}s", flush=True)
@@ -123,7 +123,7 @@ def db_vorbereiten(pfad):
     db.execute("CREATE TABLE IF NOT EXISTS metadata (name TEXT, value TEXT)")
     db.execute("CREATE UNIQUE INDEX IF NOT EXISTS metadata_index ON metadata (name)")
     for name, wert in [
-        ("name", f"Sentinel-2 cloudless {JAHRGANG} — DE+NL"),
+        ("name", f"Sentinel-2 cloudless {JAHRGANG}: DE+NL"),
         ("format", "jpg"),
         ("type", "baselayer"),
         ("version", "1"),
@@ -217,7 +217,7 @@ def main():
     db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     db.close()
     dauer = (time.monotonic() - start) / 60
-    print(f"fertig in {dauer:.0f} min — {anzahl} Kacheln im Speicher, "
+    print(f"fertig in {dauer:.0f} min, {anzahl} Kacheln im Speicher, "
           f"leer={zaehler['leer']} fehler={zaehler['fehler']}", flush=True)
     if zaehler["fehler"]:
         sys.exit(1)

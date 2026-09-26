@@ -1,7 +1,7 @@
 // Faehrt eine Route im Browser ab und protokolliert, was das Navi anzeigt.
 //
 // Warum ueberhaupt: der Folgemodus laesst sich nicht am Schreibtisch pruefen.
-// Die Fehler, die weh tun, treten erst in Bewegung auf — die Position springt
+// Die Fehler, die weh tun, treten erst in Bewegung auf, die Position springt
 // an einer gekreuzten Stelle auf den falschen Abschnitt, das Manoever wechselt
 // erst NACH dem Abbiegen, oder eine Neuberechnung feuert, obwohl man korrekt
 // faehrt. Alle drei sind an einer Zahlenreihe zu erkennen und an nichts sonst.
@@ -66,10 +66,10 @@ console.log(`Route ${daten.trip.summary.length.toFixed(1)} km, ${manoever.length
 // ★ Die Punktfolge fuer die Fahrt kommt spaeter aus der SEITE (kartenRoute).
 //   Der eigene Abruf oben bleibt als unabhaengiger Gegenwert: weichen beide
 //   Geometrien voneinander ab, stimmt etwas an der Polylinien-Auswertung der
-//   Seite nicht — genau die Falle mit fuenf statt sechs Nachkommastellen.
+//   Seite nicht: genau die Falle mit fuenf statt sechs Nachkommastellen.
 function inMesspunkte(linie, schritt) {
   // ★★ Der ERSTE Punkt der Strecke muss mit. Ohne ihn beginnt die simulierte
-  //   Fahrt eine Schrittweite hinter dem Start — bei 25 m Schrittweite also
+  //   Fahrt eine Schrittweite hinter dem Start, bei 25 m Schrittweite also
   //   25 m spaeter. Ein Manoever 11 m hinter dem Start liegt dann schon
   //   hinter einem, und die Auswertung meldet es als "nie angezeigt". Der
   //   Fehler sass im Pruefwerkzeug und sah aus wie einer in der Anzeige;
@@ -197,7 +197,7 @@ for (let i = 0; i < messpunkte.length; i++) {
   }
   if (i % 40 === 0) await schuss(`fahrt_${String(i).padStart(3, '0')}`);
   // Nachtmodus einmal mitten in der Fahrt an- und wieder ausschalten. Er
-  // faerbt Ebenen um, die es geben muss — faellt eine weg, sieht man es nur
+  // faerbt Ebenen um, die es geben muss: faellt eine weg, sieht man es nur
   // im Bild, nie in einer Zahl.
   if (i === Math.floor(messpunkte.length / 2)) {
     await klick('#navinacht'); await schlaf(900); await schuss('nacht');
@@ -227,7 +227,7 @@ for (let i = 1; i < km.length; i++) {
   if (d > 0.05) { anstiege++; groessterAnstieg = Math.max(groessterAnstieg, d); }
 }
 const wechsel = verlauf.filter((v, i) => i > 0 && v.anweisung !== verlauf[i - 1].anweisung).length;
-// Neigung und Drehung muessen wirklich anliegen — im Code standen sie schon,
+// Neigung und Drehung muessen wirklich anliegen, im Code standen sie schon,
 // als die Karte noch flach und nach Norden zeigte.
 const neigungen = verlauf.map(v => v.karte && v.karte.neigung).filter(n => typeof n === 'number');
 const flach = neigungen.filter(n => n < 40).length;
@@ -245,13 +245,13 @@ console.log(`  Neigung Median                 ${neigungen.sort((a,b)=>a-b)[Math.
 console.log(`  verschiedene Drehrichtungen    ${drehungen.size}   <- 1 hiesse: die Karte dreht nicht mit`);
 
 // ★ Die eigentliche Frage: wurde JEDES Manoever auch angezeigt? Ein Manoever,
-//   das zwischen zwei Messungen liegt, wird nie sichtbar — im Test ein Artefakt
+//   das zwischen zwei Messungen liegt, wird nie sichtbar, im Test ein Artefakt
 //   der Schrittweite, im Auto ein verpasstes Abbiegen. Deshalb wird es gezaehlt
 //   und nicht aus der Zahl der Wechsel geraten.
 const gezeigt = new Set(verlauf.map(v => v.anweisung));
 // Das erste Manoever ist bewusst ausgenommen: es beschreibt, worauf man schon
 // faehrt ("Auf X Richtung Sueden fahren"), nicht die naechste Handlung. Die
-// Anzeige zeigt immer die naechste — das ist die Zahl, die im Auto zaehlt.
+// Anzeige zeigt immer die naechste, das ist die Zahl, die im Auto zaehlt.
 const fehlend = seitenManoever.slice(1).filter(t => t && !gezeigt.has(t));
 console.log(`  nie angezeigte Manoever        ${fehlend.length} von ${Math.max(0, seitenManoever.length - 1)}` +
             (fehlend.length ? '   <- bei grober Schrittweite normal' : ''));

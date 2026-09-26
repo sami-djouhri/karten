@@ -4,23 +4,23 @@
 Aufruf im GDAL-Container:
     python3 kachle-terrain.py <dem_3857.tif> <ziel.mbtiles> <minzoom> <maxzoom>
 
-★★★ WARUM DIESES SKRIPT UEBERHAUPT EXISTIERT — die Uebersichtsstufen:
+★★★ WARUM DIESES SKRIPT UEBERHAUPT EXISTIERT, die Uebersichtsstufen:
     Bei Bildkacheln baut man die Pyramide hinterher mit `gdaladdo -r average`.
     Fuer Terrain waere das FALSCH und faellt nicht sofort auf: Terrarium kodiert
     eine Hoehe ueber drei Byte (R grob, G fein, B sehr fein). Mittelt man R, G
-    und B einzeln, mittelt man drei voneinander unabhaengige Stellenwerte —
+    und B einzeln, mittelt man drei voneinander unabhaengige Stellenwerte,
     genauso sinnvoll, wie den Mittelwert der Ziffern zweier Zahlen zu bilden.
     Ein Uebergang von 255 auf 256 Metern springt in R um 1 und in G um -255; der
     Mittelwert landet irgendwo, nur nicht dazwischen. Das Ergebnis sind Zacken
     und Loecher, die beim Herauszoomen erscheinen und beim Hineinzoomen wieder
-    verschwinden — ein Fehlerbild, das man schwer einer Mittelung zuordnet.
+    verschwinden, ein Fehlerbild, das man schwer einer Mittelung zuordnet.
 
     Deshalb: die Pyramide entsteht auf den FLOAT-Hoehen (`gdaladdo` auf dem
     Float32-Raster, dort ist Mitteln korrekt), und JEDE Zoomstufe wird einzeln
     aus der passenden Aufloesungsstufe kodiert.
 
 ★ MBTILES zaehlt die Zeilen von UNTEN (TMS), XYZ-Kacheln von oben. Ohne die
-  Umrechnung steht die Welt auf dem Kopf — und zwar nur in der Hoehe, was in
+  Umrechnung steht die Welt auf dem Kopf, und zwar nur in der Hoehe, was in
   einer 3D-Ansicht erst auffaellt, wenn man sich wundert, warum Taeler Berge sind.
 """
 import os
@@ -51,7 +51,7 @@ def terrarium(hoehe):
 
 
 def als_png(r, g, b):
-    """256x256x3 -> PNG-Bytes. Ueber GDAL statt Pillow — das Image hat kein Pillow."""
+    """256x256x3 -> PNG-Bytes. Ueber GDAL statt Pillow, das Image hat kein Pillow."""
     mem = gdal.GetDriverByName("MEM").Create("", KACHEL_PX, KACHEL_PX, 3, gdal.GDT_Byte)
     for nr, ebene in enumerate((r, g, b), start=1):
         mem.GetRasterBand(nr).WriteArray(ebene)
@@ -128,7 +128,7 @@ def main():
         y0 = int((ERDUMFANG - oben) // ks)
         y1 = int((ERDUMFANG - unten - 1e-6) // ks)
 
-        # Ein Raster je Stufe, exakt auf die Kachelgrenzen ausgerichtet — dann
+        # Ein Raster je Stufe, exakt auf die Kachelgrenzen ausgerichtet, dann
         # sind die Kacheln reine 256er-Bloecke und nichts muss verschoben werden.
         te = [x0 * ks - ERDUMFANG, ERDUMFANG - (y1 + 1) * ks,
               (x1 + 1) * ks - ERDUMFANG, ERDUMFANG - y0 * ks]
@@ -136,7 +136,7 @@ def main():
         # Die Float-Pyramide der Quelle wird hier automatisch herangezogen:
         # gdalwarp hat `-ovr AUTO` als Vorgabe und waehlt die passende
         # Uebersichtsstufe selbst. Ein explizites `warpOptions=["USE_OVERVIEWS=YES"]`
-        # ist KEINE gueltige Warp-Option — GDAL quittiert es mit
+        # ist KEINE gueltige Warp-Option: GDAL quittiert es mit
         # "warp options does not support option USE_OVERVIEWS" und macht
         # ansonsten genau dasselbe.
         gdal.Warp(stufe, ds, xRes=aufl, yRes=aufl, outputBounds=te,

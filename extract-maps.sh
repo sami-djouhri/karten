@@ -21,7 +21,7 @@ OUT_DIR="${OUT_DIR:-/home/user/knowledge-vault/maps}"
 OUT_NAME="${OUT_NAME:-de-nl.pmtiles}"
 # bbox = minLon,minLat,maxLon,maxLat
 #   Standard: Deutschland + Niederlande, volle Detailstufe z15.
-#   Nur hier werden Strassennamen gebraucht (Owner-Vorgabe 2026-08-16) — jede
+#   Nur hier werden Strassennamen gebraucht (Owner-Vorgabe 2026-08-16): jede
 #   Verbreiterung kostet quadratisch, ganz Europa waere bei z15 dreistellig GB.
 #   Deutschland allein:  5.5,47.0,15.5,55.2   (~8 GB)
 #   Europa-Uebersicht:  -11,34,40,72  mit MAXZOOM=9-10 (~1-2 GB, ohne Strassen)
@@ -65,11 +65,11 @@ log "Start: Build=$BUILD bbox=$BBOX maxzoom=$MAXZOOM -> $OUT_DIR/$OUT_NAME"
 # Ohne diese Falle endet ein Fehlschlag wegen `set -e` STILL: im Log steht dann
 # nur "Start" und nie ein Ergebnis (passiert am 2026-08-16). Jetzt hinterlaesst
 # jeder Abbruch eine Zeile.
-trap 'rc=$?; [ $rc -ne 0 ] && log "ABBRUCH (exit $rc) — alte Karte bleibt gueltig"; exit $rc' EXIT
+trap 'rc=$?; [ $rc -ne 0 ] && log "ABBRUCH (exit $rc): alte Karte bleibt gueltig"; exit $rc' EXIT
 
 # Der Protomaps-Planet wird per HTTP-Range in tausenden Chunks geholt; einzelne
 # HTTP/2-Streams brechen dabei gelegentlich ab ("INTERNAL_ERROR; received from
-# peer") — am 2026-08-16 bei 99 % von 9,3 GB. Das ist transient, also mehrfach
+# peer"), am 2026-08-16 bei 99 % von 9,3 GB. Das ist transient, also mehrfach
 # versuchen statt den ganzen Lauf zu verlieren. pmtiles kann nicht fortsetzen,
 # jeder Versuch beginnt neu.
 VERSUCHE="${VERSUCHE:-3}"
@@ -85,7 +85,7 @@ for i in $(seq 1 "$VERSUCHE"); do
   sleep 30
 done
 if [ "$erfolg" -ne 1 ]; then
-  log "FEHLER: Extract nach $VERSUCHE Versuchen aufgegeben — alte Karte bleibt gueltig"
+  log "FEHLER: Extract nach $VERSUCHE Versuchen aufgegeben; alte Karte bleibt gueltig"
   rm -f "$TMP"
   exit 3
 fi
@@ -95,7 +95,7 @@ if "$PMTILES_BIN" verify "$TMP" >/dev/null 2>&1; then
   mv -f "$TMP" "$OUT_DIR/$OUT_NAME"
   log "OK: verifiziert + atomar getauscht ($(du -h "$OUT_DIR/$OUT_NAME" | cut -f1))"
 else
-  log "FEHLER: pmtiles verify fehlgeschlagen — .tmp NICHT uebernommen (alte Karte bleibt gueltig)"
+  log "FEHLER: pmtiles verify fehlgeschlagen, .tmp NICHT uebernommen (alte Karte bleibt gueltig)"
   rm -f "$TMP"
   exit 2
 fi

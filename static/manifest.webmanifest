@@ -1,7 +1,7 @@
 {
-  "name": "Karten — Offline (Homelab)",
+  "name": "Karten offline (Homelab)",
   "short_name": "Karten",
-  "description": "Offline-Karte für Deutschland und die Niederlande mit Adresssuche und Routenplanung — ohne Internet.",
+  "description": "Offline-Karte für Deutschland und die Niederlande mit Adresssuche und Routenplanung, ohne Internet.",
   "lang": "de",
   "start_url": "/",
   "scope": "/",

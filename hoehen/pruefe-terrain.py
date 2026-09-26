@@ -6,7 +6,7 @@
 
 Der eigentliche Test ist der Vergleich mit der Quelle: für bekannte Orte wird die
 Höhe aus der fertigen Kachel dekodiert und gegen den DGM1-Rohwert an derselben
-Stelle gehalten. Damit fallen genau die Fehler auf, die sonst niemand bemerkt —
+Stelle gehalten. Damit fallen genau die Fehler auf, die sonst niemand bemerkt:
 falsche Kodierung, vertauschte Zeilenordnung (TMS gegen XYZ), Versatz um eine
 Kachel. Alle drei erzeugen ein Ergebnis, das für sich betrachtet plausibel
 aussieht: Zahlen in Metern, Relief an den richtigen Stellen, nur eben falsch.
@@ -25,7 +25,7 @@ gdal.UseExceptions()
 MBTILES = sys.argv[1] if len(sys.argv) > 1 else "/w/aus/gelaende.mbtiles"
 VRT = sys.argv[2] if len(sys.argv) > 2 else "/w/dgm.vrt"
 ZOOM = 16
-SCHWELLE = 6.0          # Meter — darüber stimmt etwas strukturell nicht
+SCHWELLE = 6.0          # Meter: darüber stimmt etwas strukturell nicht
 
 ORTE = {
     "Heiligenhaus": (7.0169, 51.3269),
@@ -53,13 +53,13 @@ def main():
     print(f"bounds  : {meta.get('bounds')}")
 
     if meta.get("encoding") != "terrarium":
-        print("WARNUNG: encoding ist nicht 'terrarium' — das Frontend rechnet dann falsch")
+        print("WARNUNG: encoding ist nicht 'terrarium', das Frontend rechnet dann falsch")
 
     roh = gdal.Open(VRT)
     gt = roh.GetGeoTransform()
     quelle = osr.SpatialReference(); quelle.ImportFromEPSG(4326)
     ziel = osr.SpatialReference(); ziel.ImportFromEPSG(25832)
-    # Ohne das kommen (Breite, Länge) statt (Länge, Breite) — siehe lies-lod2.py.
+    # Ohne das kommen (Breite, Länge) statt (Länge, Breite): siehe lies-lod2.py.
     quelle.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
     ziel.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
     wandler = osr.CoordinateTransformation(quelle, ziel)
@@ -106,7 +106,7 @@ def main():
         print(f"FEHLER: {fehlend} Kacheln fehlen")
         return 1
     if groesste > SCHWELLE:
-        print(f"FEHLER: groesste Abweichung {groesste:.1f} m — ueber der Schwelle "
+        print(f"FEHLER: groesste Abweichung {groesste:.1f} m, ueber der Schwelle "
               f"von {SCHWELLE} m. Kodierung, Zeilenordnung oder Versatz pruefen.")
         return 1
     print(f"OK: groesste Abweichung {groesste:.1f} m (Schwelle {SCHWELLE} m, "

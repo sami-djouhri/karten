@@ -4,7 +4,7 @@
 #
 # Warum DREI Archive statt einem:
 #   Die ganze 26x35-km-Flaeche in voller Quellschaerfe waere jenseits von 70 GB.
-#   Die Flaeche grob und zwei Stadtkerne scharf sind zusammen rund 12 GB — bei
+#   Die Flaeche grob und zwei Stadtkerne scharf sind zusammen rund 12 GB, bei
 #   praktisch gleichem Nutzen, weil man die volle Schaerfe nur dort braucht, wo
 #   man wirklich hinschaut. MapLibre legt die Ebenen uebereinander; die
 #   schaerfere gewinnt, wo sie vorhanden ist.
@@ -15,39 +15,39 @@
 #
 # ★ Die Zoomstufe wird NICHT als Option gesetzt, sondern ueber die Zielaufloesung
 #   erzwungen. Der MBTILES-Schreiber leitet die hoechste Stufe aus der Aufloesung
-#   des Eingangs ab — gaebe man ihm die 10-cm-Kacheln unveraendert, baute er fuer
+#   des Eingangs ab: gaebe man ihm die 10-cm-Kacheln unveraendert, baute er fuer
 #   die ganze Flaeche z20 und das Ergebnis waere dreimal so gross wie gewollt.
 #   In WebMercator ist die Aufloesung breitenunabhaengig: 156543,033928 / 2^z.
 #
 # ★★ ZWEISTUFIG, und die erste Stufe ist der ganze Unterschied:
 #   JPEG2000 zu dekodieren kostet ~28 s je Kachel und laeuft je Datei EINKERNIG.
 #   Laesst man gdalwarp direkt aus den .jp2 lesen, haengt der komplette Lauf
-#   an einem Kern — gemessen 13 % in 79 Minuten, hochgerechnet rund 10 Stunden
+#   an einem Kern: gemessen 13 % in 79 Minuten, hochgerechnet rund 10 Stunden
 #   fuer `umland` allein, bei drei brachliegenden Kernen.
 #   Deshalb: (1) jede Kachel EINMAL parallel nach gekacheltem GeoTIFF auspacken,
-#   (2) daraus warpen UND kacheln in einem Durchgang — dieselbe Kachel warpt dann
+#   (2) daraus warpen UND kacheln in einem Durchgang: dieselbe Kachel warpt dann
 #   in 5 s statt 30.
 #   _(Bis 2026-08-29 war Schritt 2 nochmals geteilt, ueber ein gekacheltes
 #   Zwischen-GeoTIFF. Das kostete bei z20 rund 46 GB Platz und war nicht einmal
-#   schneller — gemessen 110 s gegen 128 s an einem 2x2-km-Block, wobei die
+#   schneller: gemessen 110 s gegen 128 s an einem 2x2-km-Block, wobei die
 #   128 s zusaetzlich den Alphakanal und 34 % kleinere Kacheln liefern.)_
 #
 #   Nicht funktioniert hat der naheliegende Umweg `gdalwarp -ovr AUTO-1`: die .jp2
 #   tragen zwar interne Aufloesungsstufen (5000x5000, 2500x2500, …), gdalwarp holt
-#   sie ueber die VRT aber nicht heran — mit und ohne Schalter exakt 30 s. Nur
+#   sie ueber die VRT aber nicht heran, mit und ohne Schalter exakt 30 s. Nur
 #   gdal_translate greift darauf zu. Gegenprobe, falls das je jemand nachrechnet.
 #
 # ★★★ ZWEI AUSPACK-DURCHGAENGE, und das ist der Grund fuer die Bildqualitaet:
-#   Die Quelle ist JPEG2000 mit 10-facher Kompression — daran ist nichts zu
+#   Die Quelle ist JPEG2000 mit 10-facher Kompression: daran ist nichts zu
 #   aendern. Alles danach ist hausgemacht, und frueher wurde noch ZWEIMAL JPEG
 #   komprimiert (Auspacken Q90, Kacheln Q82). Drei Generationen uebereinander
 #   sieht man an Dachkanten, Zaeunen und Fahrzeugen. Jetzt:
-#     tif/       JPEG Q90  fuer die Flaeche — eine verlustbehaftete Stufe nach
+#     tif/       JPEG Q90  fuer die Flaeche, eine verlustbehaftete Stufe nach
 #                          der Quelle, danach direkt die WEBP-Kachel.
-#     tif-fein/  DEFLATE   fuer die beiden Scharf-Inseln — verlustfrei, damit
+#     tif-fein/  DEFLATE   fuer die beiden Scharf-Inseln: verlustfrei, damit
 #                          zwischen Quelle und fertiger Kachel nur EINE
 #                          verlustbehaftete Stufe liegt. Kostet rund 150 MB je
-#                          Kachel statt 22 — deshalb nur fuer die 128 Kacheln
+#                          Kachel statt 22, deshalb nur fuer die 128 Kacheln
 #                          der Inseln, nicht fuer 1330.
 #   ⚠ tif-fein/ ist derzeit LEER. stadt und solingen lassen sich also nicht neu
 #     bauen, ohne ihre Quellkacheln vorher wieder verlustfrei auszupacken
@@ -61,7 +61,7 @@ TIF_FEIN="$WURZEL/tif-fein"
 AUS="$WURZEL/aus"
 LISTE="$WURZEL/dop-liste.tsv"
 GDAL="${GDAL:-ghcr.io/osgeo/gdal:ubuntu-small-latest}"
-# Drei von vier Kernen. Der vierte bleibt fuer Valhalla frei — der Routing-Dienst
+# Drei von vier Kernen. Der vierte bleibt fuer Valhalla frei, der Routing-Dienst
 # liegt im selben LXC und soll waehrend des stundenlangen Baus bedienbar bleiben.
 PARALLEL="${PARALLEL:-3}"
 
@@ -72,7 +72,7 @@ gdal() { docker run --rm -v "$WURZEL:/w" -w /w "$GDAL" "$@"; }
 aufloesung() { python3 -c "print(f'{156543.033928 / 2**$1:.9f}')"; }
 
 # Spalte 1 der Liste ist die Markierung (aussen/innen/solingen), Spalte 2 der
-# Dateiname. `alle` nimmt jede Zeile — das ist die z19-Gesamtflaeche.
+# Dateiname. `alle` nimmt jede Zeile, das ist die z19-Gesamtflaeche.
 liste_fuer() {
     awk -F'\t' -v f="$1" -v praefix="$2" -v endung="$3" \
         '(f=="alle" || $1==f){ sub(/\.jp2$/, endung, $2); print praefix $2 }' "$LISTE"
@@ -122,11 +122,11 @@ bereich_bauen() {
     liste_fuer "$filter" "$quelle_dir/" ".tif" > "$WURZEL/$bereich.txt"
     echo "   $(wc -l < "$WURZEL/$bereich.txt") Kacheln"
 
-    # Virtuelles Mosaik — kopiert keine Bilddaten.
+    # Virtuelles Mosaik: kopiert keine Bilddaten.
     gdal gdalbuildvrt -overwrite -input_file_list "$bereich.txt" "$bereich.vrt"
 
     # ★★★ EIN Schritt: gdalwarp schreibt direkt nach MBTILES. Bis 2026-08-29 lief
-    #   das zweistufig ueber ein gekacheltes GeoTIFF — das kostete bei der
+    #   das zweistufig ueber ein gekacheltes GeoTIFF, das kostete bei der
     #   z20-Flaeche ein 46-GB-Zwischenbild und war dabei nicht einmal schneller.
     #   Gemessen an einem 2x2-km-Block (Nordwestecke, z20):
     #     zweistufig JPEG   110 s, Zwischenbild  70 MB, Kacheln 77 MB
@@ -141,7 +141,7 @@ bereich_bauen() {
     #   ganze Pilotflaeche: vorher 2,03 % schwarz UND deckend, jetzt 0,00 %.
     #
     # ★ WEBP statt JPEG, weil es als einziges verbreitetes Kachelformat mit
-    #   JPEG-aehnlicher Groesse einen Alphakanal hat — und hier sogar 34 %
+    #   JPEG-aehnlicher Groesse einen Alphakanal hat, und hier sogar 34 %
     #   kleiner ausfaellt. PNG koennte es auch, waere aber ein Vielfaches gross.
     #   pmtiles traegt genau EIN Kachelformat je Archiv, gemischt geht nicht.
     #
@@ -167,20 +167,20 @@ bereich_bauen() {
 }
 
 # Welche Kachelsaetze gebaut werden. Ohne Angabe alle drei.
-#   BEREICHE=umland ./build-dop-tiles.sh   — nur die Flaeche neu
+#   BEREICHE=umland ./build-dop-tiles.sh, nur die Flaeche neu
 # Sinnvoll, weil die beiden Inseln teuer sind (verlustfreies Auspacken) und
 # sich selten aendern, waehrend die Flaeche bei jeder Erweiterung neu muss.
 BEREICHE="${BEREICHE:-umland stadt solingen}"
 gebaut() { [[ " $BEREICHE " == *" $1 "* ]]; }
 
-# Durchgang 1: alle Kacheln als JPEG Q90 — Vorlage fuer die Flaeche.
+# Durchgang 1: alle Kacheln als JPEG Q90, Vorlage fuer die Flaeche.
 gebaut umland && auspacken "$TIF" JPEG alle
 # Durchgang 2: nur die Kacheln der Inseln verlustfrei.
 gebaut stadt && auspacken "$TIF_FEIN" DEFLATE innen
 gebaut solingen && auspacken "$TIF_FEIN" DEFLATE solingen
 
 # ★ umland laeuft seit 2026-08-25 bis z20, nicht mehr bis z19: die Quelle hat
-#   10 cm Bodenaufloesung, z20 entspricht 9,3 cm — auf der Flaeche lag also die
+#   10 cm Bodenaufloesung, z20 entspricht 9,3 cm, auf der Flaeche lag also die
 #   halbe Schaerfe brach, waehrend nur zwei Inseln von 8x8 km sie nutzten.
 #   Kostet rund das Vierfache (z19 5,5 GB -> z20 gut 20 GB je 1000 km2).
 gebaut umland   && bereich_bauen umland   20 alle     grob

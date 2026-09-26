@@ -5,12 +5,12 @@
     python3 nrw-auswahl.py lod2  > lod2-liste.tsv
 
 ★ Die Flaechengeometrie steht NICHT hier drin. Sie wird aus `dop-liste.tsv`
-  abgeleitet — derselben Datei, aus der die Luftbilder gebaut werden. Jede
+  abgeleitet: derselben Datei, aus der die Luftbilder gebaut werden. Jede
   weitere Box-Definition waere eine zweite Stelle, an der jemand die Flaeche
   aendern muesste; die zweite vergisst man, und dann liegt das Gelaende neben
   dem Bild. So ist Deckungsgleichheit strukturell garantiert statt beabsichtigt.
 
-Die Kachelnamen tragen Ost/Nord in Kilometern — die Produkte sind sich nur
+Die Kachelnamen tragen Ost/Nord in Kilometern, die Produkte sind sich nur
 uneinig, ob Zone und Ostwert getrennt stehen:
     dop10rgbi_32_361_5688_1_nw_2025.jp2  ->  (361, 5688)
     dgm1_32_361_5688_1_nw_2022.tif       ->  (361, 5688)
@@ -35,7 +35,7 @@ PRODUKTE = {
 HIER = os.path.dirname(os.path.abspath(__file__))
 DOP_LISTE = os.environ.get("DOP_LISTE", "/opt/luftbilder/dop-liste.tsv")
 
-# Zone 32, dann Ostwert (3-stellig) und Nordwert (4-stellig) — mit oder ohne
+# Zone 32, dann Ostwert (3-stellig) und Nordwert (4-stellig), mit oder ohne
 # Trennzeichen dazwischen.
 MUSTER = re.compile(r"_32_?(\d{3})_(\d{4})[_.]")
 
@@ -54,7 +54,7 @@ def main():
 
     # --- Sollflaeche aus der Luftbild-Auswahl --------------------------------
     if not os.path.exists(DOP_LISTE):
-        sys.exit(f"FEHLT: {DOP_LISTE} — erst dop-auswahl.py laufen lassen")
+        sys.exit(f"FEHLT: {DOP_LISTE}. Erst dop-auswahl.py laufen lassen")
     soll = set()
     with open(DOP_LISTE) as fh:
         for zeile in fh:
@@ -73,7 +73,7 @@ def main():
         print(f"Katalog fehlt, hole {katalog_url}", file=sys.stderr)
         with urllib.request.urlopen(katalog_url, timeout=180) as antwort:
             roh = antwort.read()
-        # Erst vollstaendig lesen, dann schreiben — ein Abbruch mitten im
+        # Erst vollstaendig lesen, dann schreiben, ein Abbruch mitten im
         # Download darf keine halbe Datei hinterlassen, die spaeter als gueltig
         # durchgeht.
         with open(katalog_datei + ".tmp", "wb") as fh:
@@ -94,7 +94,7 @@ def main():
                 katalog[idx] = (eintrag["name"], int(eintrag["size"]))
     print(f"{produkt}-Katalog: {len(katalog):,} Kacheln", file=sys.stderr)
     if not katalog:
-        sys.exit("FEHLER: Katalog leer — hat sich das Format geaendert?")
+        sys.exit("FEHLER: Katalog leer. Hat sich das Format geaendert?")
 
     # --- Schnittmenge --------------------------------------------------------
     gewaehlt, fehlend = [], []
